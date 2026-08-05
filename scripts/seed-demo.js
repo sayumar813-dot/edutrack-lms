@@ -223,10 +223,21 @@ async function main() {
     }
     createdTeachers.push(teacher);
 
-    // Assign teacher to a class
+    // Assign teacher to their class
     const cls = createdClasses[i % createdClasses.length];
     await Class.findByIdAndUpdate(cls._id, { teacherId: teacher._id });
-    console.log(`   ✅ ${td.name} → assigned to ${cls.name}`);
+
+    // Assign ALL subjects of that class to the teacher
+    const classSubjects = createdSubjects[cls._id] || [];
+    const subjectIds = classSubjects.map(s => s._id);
+
+    // Update teacher's subjectsAssigned array
+    await Teacher.findByIdAndUpdate(teacher._id, { subjectsAssigned: subjectIds });
+
+    // Link each subject back to this teacher
+    await Subject.updateMany({ _id: { $in: subjectIds } }, { teacherId: teacher._id });
+
+    console.log(`   ✅ ${td.name} → ${cls.name} (${classSubjects.length} subjects assigned)`);
   }
 
   // ── CREATE STUDENTS ───────────────────────────────────────────────────────
