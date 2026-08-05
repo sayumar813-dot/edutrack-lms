@@ -13,25 +13,25 @@ export async function GET(req) {
   try {
     await connectToDatabase();
 
-    // Teacher scoping: View subjects for assigned classes or directly assigned subjects
+    // Teacher scoping: Only subjects directly assigned to this teacher via Subject.teacherId
+    // This correctly supports multi-teacher classes — teacher only sees their own subjects
     if (session.role === 'teacher') {
       const teacherProfile = await Teacher.findOne({ userId: session.userId });
       if (!teacherProfile) {
         return Response.json({ success: true, subjects: [] });
       }
 
-      const assignedClasses = await Class.find({ teacherId: teacherProfile._id }).select('_id');
-      const classIds = assignedClasses.map(c => c._id);
+      const { searchParams } = new URL(req.url);
+      const classIdFilter = searchParams.get('classId');
 
-      const subjects = await Subject.find({
-        $or: [
-          { classId: { $in: classIds } },
-          { _id: { $in: teacherProfile.subjectsAssigned || [] } },
-        ],
-      }).populate('classId', 'name');
+      // Build query: subjects taught by this teacher, optionally filtered by class
+      const subjectQuery = { teacherId: teacherProfile._id };
+      if (classIdFilter) subjectQuery.classId = classIdFilter;
 
+      const subjects = await Subject.find(subjectQuery).populate('classId', 'name');
       return Response.json({ success: true, subjects });
     }
+
 
     // Student scoping: View subjects belonging to enrolled class only
     if (session.role === 'student') {

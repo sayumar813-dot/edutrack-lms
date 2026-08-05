@@ -75,8 +75,13 @@ export async function GET(req) {
       if (!teacherProfile) {
         return Response.json({ success: true, records: [], analytics: buildEmptyAnalytics() });
       }
-      const assignedClasses = await Class.find({ teacherId: teacherProfile._id }).select('_id');
-      query.classId = { $in: assignedClasses.map(c => c._id) };
+      // Find classes via subjects taught by this teacher (multi-teacher class support)
+      const taughtSubjects = await Subject.find({ teacherId: teacherProfile._id }).select('_id classId');
+      const taughtSubjectIds = taughtSubjects.map(s => s._id);
+      const classIds = [...new Set(taughtSubjects.map(s => s.classId.toString()))];
+      // Scope attendance to only THIS teacher's subjects
+      query.subjectId = { $in: taughtSubjectIds };
+      if (classIds.length > 0) query.classId = { $in: classIds };
     }
 
     if (classId) query.classId = classId;

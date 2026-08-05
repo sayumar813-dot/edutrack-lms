@@ -4,8 +4,10 @@ import User from '@/models/User';
 import Student from '@/models/Student';
 import Teacher from '@/models/Teacher';
 import Class from '@/models/Class';
+import Subject from '@/models/Subject';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
+
 
 // GET /api/admin/students - List students with role-based privacy scoping
 export async function GET(req) {
@@ -18,14 +20,14 @@ export async function GET(req) {
     const { searchParams } = new URL(req.url);
     const classIdFilter = searchParams.get('classId');
 
-    // Teacher Scoping: Only see students enrolled in classes assigned to this teacher
+    // Teacher Scoping: See students enrolled in classes where this teacher teaches a subject
     if (session.role === 'teacher') {
       const teacherProfile = await Teacher.findOne({ userId: session.userId });
       if (!teacherProfile) {
         return Response.json({ success: true, students: [] });
       }
 
-      // If a specific classId is requested, filter to that class (within teacher's scope)
+      // If a specific classId is requested, return students from that class directly
       if (classIdFilter) {
         const students = await Student.find({ classId: classIdFilter })
           .populate('userId', 'name email role createdAt')
@@ -33,8 +35,9 @@ export async function GET(req) {
         return Response.json({ success: true, students });
       }
 
-      const assignedClasses = await Class.find({ teacherId: teacherProfile._id }).select('_id');
-      const classIds = assignedClasses.map(c => c._id);
+      // Find all classes where this teacher teaches at least one subject
+      const taughtSubjects = await Subject.find({ teacherId: teacherProfile._id }).select('classId');
+      const classIds = [...new Set(taughtSubjects.map(s => s.classId.toString()))];
 
       const students = await Student.find({ classId: { $in: classIds } })
         .populate('userId', 'name email role createdAt')

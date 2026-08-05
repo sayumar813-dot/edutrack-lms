@@ -71,14 +71,21 @@ export default function TeacherPage() {
 
   const loadStudentsAndSubjects = async (classId) => {
     try {
-      const [sData, attData] = await Promise.all([
+      const [sData, subData, attData] = await Promise.all([
         apiClient(`/api/admin/students?classId=${classId}`),
+        apiClient(`/api/admin/subjects?classId=${classId}`),
         selectedSubject
           ? apiClient(`/api/attendance?classId=${classId}&subjectId=${selectedSubject}&date=${attendanceDate}`)
           : Promise.resolve({ records: [] }),
       ]);
 
       setStudents(sData.students || []);
+      setSubjects(subData.subjects || []);
+
+      // Auto-select first subject if none selected
+      if (!selectedSubject && subData.subjects && subData.subjects.length > 0) {
+        setSelectedSubject(subData.subjects[0]._id);
+      }
 
       const initialAttendance = {};
       (sData.students || []).forEach((st) => {
@@ -91,6 +98,7 @@ export default function TeacherPage() {
       console.error('Error loading students:', err);
     }
   };
+
 
   const handleStatusChange = (studentId, status) => {
     setAttendanceData((prev) => ({

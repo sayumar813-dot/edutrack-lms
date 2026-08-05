@@ -15,13 +15,20 @@ export async function GET(req) {
 
     let classQuery = {};
 
-    // Teacher scoping: View assigned classes only
+    // Teacher scoping: Find all classes where this teacher teaches AT LEAST ONE subject
+    // This supports multi-teacher classes (each subject has its own teacher)
     if (session.role === 'teacher') {
       const teacherProfile = await Teacher.findOne({ userId: session.userId });
       if (!teacherProfile) {
         return Response.json({ success: true, classes: [] });
       }
-      classQuery = { teacherId: teacherProfile._id };
+      // Find all subjects taught by this teacher → get unique classIds
+      const taughtSubjects = await Subject.find({ teacherId: teacherProfile._id }).select('classId');
+      const classIds = [...new Set(taughtSubjects.map(s => s.classId.toString()))];
+      if (classIds.length === 0) {
+        return Response.json({ success: true, classes: [] });
+      }
+      classQuery = { _id: { $in: classIds } };
     }
 
     // Student scoping: View own enrolled class only
