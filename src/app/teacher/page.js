@@ -237,7 +237,7 @@ export default function TeacherPage() {
 
         {/* TAB 1: MARK ATTENDANCE */}
         {activeTab === 'attendance' && (
-          <div>
+          <div key="attendance" className="tab-content-animate">
             <div className="glass-card" style={{ padding: '28px', marginBottom: '32px' }}>
               <h2 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '20px', color: 'var(--text-main)' }}>
                 Select Class, Subject & Date
@@ -371,7 +371,7 @@ export default function TeacherPage() {
 
         {/* TAB 2: MY CLASSES & SUBJECTS */}
         {activeTab === 'subjects' && (
-          <div className="glass-card" style={{ padding: '28px' }}>
+          <div key="subjects" className="tab-content-animate glass-card" style={{ padding: '28px' }}>
             <h2 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '20px', color: 'var(--text-main)' }}>
               Assigned Classes & Subjects Directory
             </h2>
@@ -402,7 +402,7 @@ export default function TeacherPage() {
 
         {/* TAB 3: CLASS REPORTS & CSV EXPORT */}
         {activeTab === 'reports' && (
-          <div>
+          <div key="reports" className="tab-content-animate">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
               <h2 style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-main)' }}>
                 Real-Time Class Attendance Analytics & Export

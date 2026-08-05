@@ -104,7 +104,7 @@ export default function StudentPage() {
 
         {/* TAB 1: MY ATTENDANCE */}
         {activeTab === 'my-attendance' && (
-          <div>
+          <div key="my-attendance" className="tab-content-animate">
             {/* Student Personal Stats Cards */}
             <div className="responsive-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '18px', marginBottom: '28px' }}>
               

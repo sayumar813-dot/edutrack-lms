@@ -356,7 +356,7 @@ export default function AdminPage() {
 
         {/* TAB 1: OVERVIEW DASHBOARD WITH REAL-TIME GRAPHS */}
         {activeTab === 'dashboard' && (
-          <div>
+          <div key="dashboard" className="tab-content-animate">
             {/* Real-time Summary Cards */}
             <div className="responsive-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '32px' }}>
               <div className="glass-card" style={{ padding: '24px', textAlign: 'center' }}>
@@ -384,7 +384,7 @@ export default function AdminPage() {
 
         {/* TAB 2: REPORTS & ANALYTICS EXPORT */}
         {activeTab === 'reports' && (
-          <div>
+          <div key="reports" className="tab-content-animate">
             <div className="glass-card" style={{ padding: '28px', marginBottom: '36px' }}>
               <h2 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '20px', color: 'var(--text-main)' }}>
                 Filter & Generate Attendance Reports
@@ -517,7 +517,7 @@ export default function AdminPage() {
 
         {/* TAB 3: MANAGE TEACHERS */}
         {activeTab === 'teachers' && (
-          <div>
+          <div key="teachers" className="tab-content-animate">
             <div className="glass-card" style={{ padding: '28px', marginBottom: '36px' }}>
               <h2 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '20px', color: 'var(--text-main)' }}>Add New Teacher</h2>
               <form onSubmit={handleCreateTeacher} className="form-responsive" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
@@ -611,7 +611,7 @@ export default function AdminPage() {
 
         {/* TAB 4: MANAGE STUDENTS */}
         {activeTab === 'students' && (
-          <div>
+          <div key="students" className="tab-content-animate">
             <div className="glass-card" style={{ padding: '28px', marginBottom: '36px' }}>
               <h2 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '20px', color: 'var(--text-main)' }}>Add New Student</h2>
               <form onSubmit={handleCreateStudent} className="form-responsive" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
@@ -707,7 +707,7 @@ export default function AdminPage() {
                                 fontSize: '13px',
                               }}
                             >
-                              🗑️ Remove
+                              Remove
                             </button>
                           </td>
                         </tr>
@@ -722,7 +722,7 @@ export default function AdminPage() {
 
         {/* TAB 5: MANAGE CLASSES */}
         {activeTab === 'classes' && (
-          <div>
+          <div key="classes" className="tab-content-animate">
             {/* Create or Edit Class Form */}
             <div className="glass-card" style={{ padding: '28px', marginBottom: '36px' }}>
               <h2 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '20px', color: 'var(--text-main)' }}>
@@ -805,7 +805,7 @@ export default function AdminPage() {
                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                               {c.subjects.map((sub, idx) => (
                                 <span key={idx} style={{ background: 'rgba(0, 243, 255, 0.12)', color: 'var(--primary-color)', padding: '4px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: '600', border: '1px solid rgba(0, 243, 255, 0.25)' }}>
-                                  📚 {sub}
+                                  {sub}
                                 </span>
                               ))}
                             </div>
@@ -824,7 +824,7 @@ export default function AdminPage() {
 
         {/* TAB 6: MANAGE SUBJECTS */}
         {activeTab === 'subjects' && (
-          <div>
+          <div key="subjects" className="tab-content-animate">
             <div className="glass-card" style={{ padding: '28px', marginBottom: '36px' }}>
               <h2 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '20px', color: 'var(--text-main)' }}>Create Subject</h2>
               <form onSubmit={handleCreateSubject} className="form-responsive" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
