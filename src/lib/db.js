@@ -1,12 +1,6 @@
 import mongoose from 'mongoose';
 import dns from 'dns';
 
-const MONGO_URI = process.env.MONGO_URI;
-
-if (!MONGO_URI) {
-  throw new Error('Please define the MONGO_URI environment variable inside .env.local');
-}
-
 let cached = global.mongoose;
 
 if (!cached) {
@@ -14,7 +8,13 @@ if (!cached) {
 }
 
 async function connectToDatabase() {
-  // Force DNS resolver to public DNS (8.8.8.8) to prevent Windows querySrv ECONNREFUSED on mongodb+srv://
+  const MONGO_URI = process.env.MONGO_URI;
+
+  if (!MONGO_URI) {
+    throw new Error('Please define the MONGO_URI environment variable in Vercel Environment Variables or .env.local');
+  }
+
+  // Force DNS resolver to public DNS (8.8.8.8) to prevent querySrv ECONNREFUSED
   try {
     dns.setServers(['8.8.8.8', '1.1.1.1']);
   } catch (e) {
@@ -29,7 +29,7 @@ async function connectToDatabase() {
     const opts = {
       bufferCommands: false,
       serverSelectionTimeoutMS: 10000,
-      family: 4, // Force IPv4 to prevent SRV lookup failures on Windows
+      family: 4, // Force IPv4
     };
 
     cached.promise = mongoose.connect(MONGO_URI, opts).then((mongooseInstance) => {
