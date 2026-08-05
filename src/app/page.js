@@ -11,7 +11,6 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [showQuickFill, setShowQuickFill] = useState(false);
 
   const { user, login } = useAuth();
   const { theme, toggleTheme } = useTheme();
@@ -45,20 +44,6 @@ export default function LoginPage() {
     }
   };
 
-  const handleQuickFill = (selectedRole) => {
-    setRole(selectedRole);
-    if (selectedRole === 'admin') {
-      setEmail('admin@edutrack.com');
-      setPassword('Admin@12345');
-    } else if (selectedRole === 'teacher') {
-      setEmail('ali.hassan@demo.edutrack.com');
-      setPassword('Demo@12345');
-    } else if (selectedRole === 'student') {
-      setEmail('student@demo.edutrack.com');
-      setPassword('Demo@12345');
-    }
-  };
-
   return (
     <div style={{ display: 'flex', minHeight: '100vh', justifyContent: 'center', alignItems: 'center', padding: '24px', position: 'relative', overflow: 'hidden' }}>
       
@@ -73,13 +58,13 @@ export default function LoginPage() {
         className="theme-toggle-btn"
         style={{ position: 'absolute', top: '24px', right: '24px', padding: '10px 20px', fontSize: '14px', zIndex: 10 }}
       >
-        <span>{theme === 'dark' ? '☀️ Light Mode' : '🌙 Dark Mode'}</span>
+        <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
       </button>
 
       {/* Login Card */}
-      <div className="glass-card login-card" style={{ width: '100%', maxWidth: '460px', padding: '44px 36px', textAlign: 'center', position: 'relative', zIndex: 1, boxShadow: '0 20px 50px rgba(0, 0, 0, 0.25)', borderRadius: '24px' }}>
+      <div className="glass-card login-card" style={{ width: '100%', maxWidth: '440px', padding: '44px 36px', textAlign: 'center', position: 'relative', zIndex: 1, boxShadow: '0 20px 50px rgba(0, 0, 0, 0.25)', borderRadius: '24px' }}>
         
-        {/* Animated Brand Logo Container */}
+        {/* Brand Logo Container */}
         <div style={{ background: '#ffffff', padding: '12px', borderRadius: '22px', boxShadow: '0 10px 30px rgba(0,0,0,0.12), 0 0 25px rgba(0, 243, 255, 0.25)', border: '2px solid rgba(0, 243, 255, 0.3)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '88px', height: '88px', marginBottom: '18px', transition: 'all 0.3s ease' }}>
           <img src="/logo.png" alt="LMS Logo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
         </div>
@@ -91,12 +76,12 @@ export default function LoginPage() {
           Single-Academy SaaS Management Portal
         </p>
 
-        {/* Modern Role Selector Tabs */}
+        {/* Clean Role Selector Tabs */}
         <div style={{ display: 'flex', background: 'var(--input-bg)', padding: '5px', borderRadius: '16px', marginBottom: '24px', border: '1px solid var(--border-color)', gap: '4px' }}>
           {[
-            { id: 'admin', label: 'Admin', icon: '👑' },
-            { id: 'teacher', label: 'Teacher', icon: '👨‍🏫' },
-            { id: 'student', label: 'Student', icon: '🎓' },
+            { id: 'admin', label: 'Admin' },
+            { id: 'teacher', label: 'Teacher' },
+            { id: 'student', label: 'Student' },
           ].map((item) => {
             const isActive = role === item.id;
             return (
@@ -116,46 +101,35 @@ export default function LoginPage() {
                   cursor: 'pointer',
                   transition: 'all 0.25s cubic-bezier(0.4, 0, 0.2, 1)',
                   boxShadow: isActive ? '0 6px 18px rgba(0, 243, 255, 0.35)' : 'none',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '6px',
                 }}
               >
-                <span>{item.icon}</span>
-                <span>{item.label}</span>
+                {item.label}
               </button>
             );
           })}
         </div>
 
         {error && (
-          <div style={{ background: 'rgba(249, 76, 102, 0.15)', color: '#ff4d4d', padding: '12px 16px', borderRadius: '12px', fontSize: '13px', marginBottom: '20px', border: '1px solid rgba(249, 76, 102, 0.35)', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '8px', textAlign: 'left' }}>
-            <span>⚠️</span>
-            <span>{error}</span>
+          <div style={{ background: 'rgba(249, 76, 102, 0.15)', color: '#ff4d4d', padding: '12px 16px', borderRadius: '12px', fontSize: '13px', marginBottom: '20px', border: '1px solid rgba(249, 76, 102, 0.35)', fontWeight: '600', textAlign: 'left' }}>
+            {error}
           </div>
         )}
 
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }} autoComplete="off">
           
-          {/* Email Field with Icon */}
-          <div style={{ position: 'relative', width: '100%' }}>
-            <span style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', fontSize: '16px', color: 'var(--text-muted)' }}>✉️</span>
-            <input
-              type="email"
-              className="input-field"
-              placeholder={`${role.charAt(0).toUpperCase() + role.slice(1)} Email Address`}
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              style={{ paddingLeft: '44px' }}
-              autoComplete="new-email"
-            />
-          </div>
+          {/* Email Field */}
+          <input
+            type="email"
+            className="input-field"
+            placeholder={`${role.charAt(0).toUpperCase() + role.slice(1)} Email Address`}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            autoComplete="new-email"
+          />
 
-          {/* Password Field with Toggle Eye Icon */}
+          {/* Password Field with Show/Hide button */}
           <div style={{ position: 'relative', width: '100%' }}>
-            <span style={{ position: 'absolute', left: '16px', top: '50%', transform: 'translateY(-50%)', fontSize: '16px', color: 'var(--text-muted)' }}>🔒</span>
             <input
               type={showPassword ? 'text' : 'password'}
               className="input-field"
@@ -163,7 +137,7 @@ export default function LoginPage() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              style={{ paddingLeft: '44px', paddingRight: '48px' }}
+              style={{ paddingRight: '60px' }}
               autoComplete="new-password"
             />
             <button
@@ -177,17 +151,13 @@ export default function LoginPage() {
                 background: 'none',
                 border: 'none',
                 cursor: 'pointer',
-                fontSize: '18px',
-                color: 'var(--text-muted)',
-                padding: '6px',
-                borderRadius: '8px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
+                fontSize: '12px',
+                fontWeight: '700',
+                color: 'var(--primary-color)',
+                padding: '4px 8px',
               }}
-              title={showPassword ? 'Hide Password' : 'Show Password'}
             >
-              {showPassword ? '👁️' : '🙈'}
+              {showPassword ? 'Hide' : 'Show'}
             </button>
           </div>
 
@@ -201,38 +171,7 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {/* Quick Demo Credentials Helper */}
-        <div style={{ marginTop: '22px' }}>
-          <button
-            type="button"
-            onClick={() => setShowQuickFill(!showQuickFill)}
-            style={{ background: 'transparent', border: 'none', color: 'var(--primary-color)', fontSize: '13px', fontWeight: '600', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-          >
-            <span>⚡ Quick Demo Credentials</span>
-            <span style={{ fontSize: '10px' }}>{showQuickFill ? '▲' : '▼'}</span>
-          </button>
-
-          {showQuickFill && (
-            <div style={{ marginTop: '12px', background: 'var(--subcard-bg)', padding: '12px', borderRadius: '14px', border: '1px solid var(--border-color)', display: 'flex', gap: '8px', justifyContent: 'center' }}>
-              {[
-                { id: 'admin', label: '👑 Admin' },
-                { id: 'teacher', label: '👨‍🏫 Teacher' },
-                { id: 'student', label: '🎓 Student' },
-              ].map(d => (
-                <button
-                  key={d.id}
-                  type="button"
-                  onClick={() => handleQuickFill(d.id)}
-                  style={{ background: 'var(--glass-bg)', border: '1px solid var(--border-color)', color: 'var(--text-main)', padding: '6px 12px', borderRadius: '10px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', transition: 'all 0.2s ease' }}
-                >
-                  {d.label}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div style={{ marginTop: '20px', paddingTop: '16px', borderTop: '1px solid var(--border-color)', fontSize: '12px', color: 'var(--text-muted)' }}>
+        <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--border-color)', fontSize: '12px', color: 'var(--text-muted)' }}>
           Secured by EduTrack JWT Authentication
         </div>
 

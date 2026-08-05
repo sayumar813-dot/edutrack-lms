@@ -133,19 +133,18 @@ export default function Sidebar({ activeTab, setActiveTab }) {
           {user?.role === 'admin' && (
             <nav style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {[
-                { id: 'dashboard', label: 'Dashboard & Graphs', icon: '📊' },
-                { id: 'teachers', label: 'Manage Teachers', icon: '👨‍🏫' },
-                { id: 'students', label: 'Manage Students', icon: '🎓' },
-                { id: 'classes', label: 'Manage Classes', icon: '🏫' },
-                { id: 'subjects', label: 'Manage Subjects', icon: '📚' },
-                { id: 'reports', label: 'Reports & Export', icon: '📄' },
+                { id: 'dashboard', label: 'Dashboard & Graphs' },
+                { id: 'teachers', label: 'Manage Teachers' },
+                { id: 'students', label: 'Manage Students' },
+                { id: 'classes', label: 'Manage Classes' },
+                { id: 'subjects', label: 'Manage Subjects' },
+                { id: 'reports', label: 'Reports & Export' },
               ].map((item) => (
                 <button
                   key={item.id}
                   onClick={() => handleNavClick(item.id)}
                   className={`sidebar-nav-btn ${activeTab === item.id ? 'active' : ''}`}
                 >
-                  <span style={{ fontSize: '20px' }}>{item.icon}</span>
                   <span>{item.label}</span>
                 </button>
               ))}
@@ -155,16 +154,15 @@ export default function Sidebar({ activeTab, setActiveTab }) {
           {user?.role === 'teacher' && (
             <nav style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {[
-                { id: 'attendance', label: 'Mark Attendance', icon: '📝' },
-                { id: 'subjects', label: 'My Classes & Subjects', icon: '📚' },
-                { id: 'reports', label: 'Class Reports & CSV', icon: '📈' },
+                { id: 'attendance', label: 'Mark Attendance' },
+                { id: 'subjects', label: 'My Classes & Subjects' },
+                { id: 'reports', label: 'Class Reports & CSV' },
               ].map((item) => (
                 <button
                   key={item.id}
                   onClick={() => handleNavClick(item.id)}
                   className={`sidebar-nav-btn ${activeTab === item.id ? 'active' : ''}`}
                 >
-                  <span style={{ fontSize: '20px' }}>{item.icon}</span>
                   <span>{item.label}</span>
                 </button>
               ))}
@@ -174,14 +172,13 @@ export default function Sidebar({ activeTab, setActiveTab }) {
           {user?.role === 'student' && (
             <nav style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {[
-                { id: 'my-attendance', label: 'My Attendance', icon: '📜' },
+                { id: 'my-attendance', label: 'My Attendance' },
               ].map((item) => (
                 <button
                   key={item.id}
                   onClick={() => handleNavClick(item.id)}
                   className={`sidebar-nav-btn ${activeTab === item.id ? 'active' : ''}`}
                 >
-                  <span style={{ fontSize: '20px' }}>{item.icon}</span>
                   <span>{item.label}</span>
                 </button>
               ))}
@@ -196,16 +193,14 @@ export default function Sidebar({ activeTab, setActiveTab }) {
             className="sidebar-nav-btn"
             style={{ textDecoration: 'none', color: 'var(--text-muted)' }}
           >
-            <span style={{ fontSize: '18px' }}>🔑</span>
             <span>Change Password</span>
           </Link>
 
           <button
             onClick={handleLogout}
             className="sidebar-nav-btn danger"
-            style={{ width: '100%', background: 'rgba(249, 76, 102, 0.1)', color: '#ff4d4d', border: '1px solid rgba(249, 76, 102, 0.2)' }}
+            style={{ width: '100%', background: 'rgba(249, 76, 102, 0.1)', color: '#ff4d4d', border: '1px solid rgba(249, 76, 102, 0.2)', justifyContent: 'center' }}
           >
-            <span style={{ fontSize: '18px' }}>🚪</span>
             <span>Logout</span>
           </button>
         </div>

@@ -92,7 +92,7 @@ export default function StudentPage() {
             className="theme-toggle-btn"
             style={{ padding: '10px 20px', fontSize: '15px' }}
           >
-            <span>{theme === 'dark' ? '☀️ Light Mode' : '🌙 Dark Mode'}</span>
+            <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
           </button>
         </div>
 
@@ -122,7 +122,7 @@ export default function StudentPage() {
                     <div style={{ width: `${attendancePct}%`, height: '100%', background: pctColor, transition: 'width 0.6s ease' }} />
                   </div>
                   <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginTop: '6px' }}>
-                    {attendancePct >= 75 ? '🎯 On track (≥75% required)' : '⚠️ Low attendance warning'}
+                    {attendancePct >= 75 ? 'On track (≥75% required)' : 'Low attendance warning'}
                   </span>
                 </div>
               </div>
@@ -132,7 +132,7 @@ export default function StudentPage() {
                 <h3 style={{ fontSize: '38px', color: '#2bd49e', fontWeight: '800', margin: '4px 0 4px' }}>
                   {stats?.present || 0}
                 </h3>
-                <span style={{ fontSize: '12px', color: '#2bd49e', fontWeight: '600' }}>✅ Classes attended</span>
+                <span style={{ fontSize: '12px', color: '#2bd49e', fontWeight: '600' }}>Classes attended</span>
               </div>
 
               <div className="glass-card" style={{ padding: '20px 24px', textAlign: 'center' }}>
@@ -140,7 +140,7 @@ export default function StudentPage() {
                 <h3 style={{ fontSize: '38px', color: '#ff4d4d', fontWeight: '800', margin: '4px 0 4px' }}>
                   {stats?.absent || 0}
                 </h3>
-                <span style={{ fontSize: '12px', color: '#ff4d4d', fontWeight: '600' }}>❌ Classes missed</span>
+                <span style={{ fontSize: '12px', color: '#ff4d4d', fontWeight: '600' }}>Classes missed</span>
               </div>
 
               <div className="glass-card" style={{ padding: '20px 24px', textAlign: 'center' }}>
@@ -148,7 +148,7 @@ export default function StudentPage() {
                 <h3 style={{ fontSize: '38px', color: '#ffb703', fontWeight: '800', margin: '4px 0 4px' }}>
                   {stats?.late || 0}
                 </h3>
-                <span style={{ fontSize: '12px', color: '#ffb703', fontWeight: '600' }}>⏰ Arrived late</span>
+                <span style={{ fontSize: '12px', color: '#ffb703', fontWeight: '600' }}>Arrived late</span>
               </div>
             </div>
 
@@ -156,7 +156,7 @@ export default function StudentPage() {
             {subjectBreakdown.length > 0 && (
               <div className="glass-card" style={{ padding: '24px', marginBottom: '28px' }}>
                 <h2 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '16px', color: 'var(--text-main)' }}>
-                  📚 Subject-Wise Attendance
+                  Subject-Wise Attendance
                 </h2>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
                   {subjectBreakdown.map((sub, idx) => {
@@ -188,7 +188,7 @@ export default function StudentPage() {
             <div className="glass-card" style={{ padding: '28px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
                 <h2 style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-main)', margin: 0 }}>
-                  📜 Personal Attendance Record ({filteredLog.length})
+                  Personal Attendance Record ({filteredLog.length})
                 </h2>
 
                 {/* Subject Filter */}

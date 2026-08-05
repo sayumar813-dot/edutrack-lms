@@ -5,7 +5,7 @@ export default function AnalyticsCharts({ analytics }) {
     return (
       <div style={{ background: 'var(--input-bg)', padding: '30px', borderRadius: '16px', textAlign: 'center', border: '1px solid var(--border-color)', margin: '20px 0' }}>
         <p style={{ color: 'var(--text-muted)', fontSize: '15px' }}>
-          📊 No attendance records available for real-time graph calculation yet. Mark attendance to generate live charts!
+          No attendance records available for real-time graph calculation yet. Mark attendance to generate live charts!
         </p>
       </div>
     );
@@ -35,7 +35,7 @@ export default function AnalyticsCharts({ analytics }) {
       <div className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
           <h3 style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-main)' }}>
-            🍩 Attendance Breakdown
+            Attendance Breakdown
           </h3>
           <span style={{ fontSize: '13px', background: 'rgba(0, 243, 255, 0.15)', color: 'var(--primary-color)', padding: '4px 10px', borderRadius: '12px', fontWeight: '700' }}>
             {totalRecords} Total Records
@@ -125,7 +125,7 @@ export default function AnalyticsCharts({ analytics }) {
       <div className="glass-card" style={{ padding: '24px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
           <h3 style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-main)' }}>
-            📈 7-Day Attendance Trend
+            7-Day Attendance Trend
           </h3>
           {/* Stacked legend */}
           <div style={{ display: 'flex', gap: '12px' }}>
@@ -193,8 +193,9 @@ export default function AnalyticsCharts({ analytics }) {
       {/* CHART 3: Class Performance Overview */}
       <div className="glass-card" style={{ padding: '24px', gridColumn: '1 / -1' }}>
         <h3 style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '16px' }}>
-          🏫 Class Attendance Rates
+          Class Attendance Rates
         </h3>
+
 
         {classPerformance.length === 0 ? (
           <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>No class performance metrics generated yet.</p>

@@ -283,7 +283,7 @@ export default function TeacherPage() {
                   className="btn-primary"
                   style={{ background: 'linear-gradient(135deg, #2bd49e 0%, #0d9488 100%)' }}
                 >
-                  {submitting ? 'Submitting...' : '💾 Submit Attendance'}
+                  {submitting ? 'Submitting...' : 'Submit Attendance'}
                 </button>
               </div>
 
@@ -387,7 +387,7 @@ export default function TeacherPage() {
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
                       {c.subjects.map((sub, idx) => (
                         <span key={idx} style={{ background: 'rgba(0, 243, 255, 0.12)', color: 'var(--primary-color)', padding: '4px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: '600', border: '1px solid rgba(0, 243, 255, 0.25)' }}>
-                          📚 {sub}
+                          {sub}
                         </span>
                       ))}
                     </div>
@@ -413,16 +413,16 @@ export default function TeacherPage() {
                   type="button"
                   onClick={handleExportCSV}
                   className="btn-primary"
-                  style={{ background: 'linear-gradient(135deg, #2bd49e 0%, #0d9488 100%)' }}
+                  style={{ padding: '10px 18px', fontSize: '13px' }}
                 >
-                  📥 Export Class Report to CSV
+                  Export Class Report to CSV
                 </button>
                 <button
                   type="button"
                   onClick={() => window.print()}
                   style={{ padding: '12px 20px', borderRadius: '12px', background: 'rgba(255,255,255,0.1)', color: 'var(--text-main)', border: '1px solid var(--border-color)', cursor: 'pointer', fontWeight: '600' }}
                 >
-                  🖨️ Print Report
+                  Print Report
                 </button>
               </div>
             </div>

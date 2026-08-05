@@ -55,7 +55,7 @@ export default function ChangePasswordPage() {
       <div className="glass-card" style={{ width: '100%', maxWidth: '440px', padding: '40px 30px', textAlign: 'center' }}>
         
         <div style={{ background: 'rgba(0, 243, 255, 0.1)', width: '60px', height: '60px', borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginBottom: '15px', color: 'var(--primary-color)', fontSize: '24px' }}>
-          🔒
+          Key
         </div>
 
         <h1 style={{ fontSize: '24px', marginBottom: '8px', fontWeight: '700' }}>
@@ -82,7 +82,7 @@ export default function ChangePasswordPage() {
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 autoComplete="new-password"
-                style={{ paddingRight: '45px' }}
+                style={{ paddingRight: '60px' }}
                 required
               />
               <button
@@ -95,13 +95,14 @@ export default function ChangePasswordPage() {
                   transform: 'translateY(-50%)',
                   background: 'none',
                   border: 'none',
-                  color: 'var(--text-muted)',
+                  color: 'var(--primary-color)',
                   cursor: 'pointer',
-                  fontSize: '16px',
+                  fontSize: '12px',
+                  fontWeight: '700',
                   padding: '4px',
                 }}
               >
-                {showNewPassword ? '👁️' : '👁️‍🗨️'}
+                {showNewPassword ? 'Hide' : 'Show'}
               </button>
             </div>
           </div>
@@ -116,7 +117,7 @@ export default function ChangePasswordPage() {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 autoComplete="new-password"
-                style={{ paddingRight: '45px' }}
+                style={{ paddingRight: '60px' }}
                 required
               />
               <button
@@ -129,13 +130,14 @@ export default function ChangePasswordPage() {
                   transform: 'translateY(-50%)',
                   background: 'none',
                   border: 'none',
-                  color: 'var(--text-muted)',
+                  color: 'var(--primary-color)',
                   cursor: 'pointer',
-                  fontSize: '16px',
+                  fontSize: '12px',
+                  fontWeight: '700',
                   padding: '4px',
                 }}
               >
-                {showConfirmPassword ? '👁️' : '👁️‍🗨️'}
+                {showConfirmPassword ? 'Hide' : 'Show'}
               </button>
             </div>
           </div>

@@ -316,7 +316,7 @@ export default function AdminPage() {
             className="theme-toggle-btn"
             style={{ padding: '10px 20px', fontSize: '15px' }}
           >
-            <span>{theme === 'dark' ? '☀️ Light Mode' : '🌙 Dark Mode'}</span>
+            <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
           </button>
         </div>
 
@@ -336,7 +336,7 @@ export default function AdminPage() {
         {createdAccount && (
           <div style={{ background: 'rgba(43, 212, 158, 0.15)', border: '1px solid rgba(43, 212, 158, 0.4)', borderRadius: '16px', padding: '20px', marginBottom: '30px' }}>
             <h3 style={{ color: 'var(--secondary-color)', fontSize: '18px', fontWeight: '700', marginBottom: '8px' }}>
-              🎉 {createdAccount.role} Account Created Successfully!
+              {createdAccount.role} Account Created Successfully!
             </h3>
             <p style={{ color: 'var(--text-main)', fontSize: '14px', marginBottom: '12px' }}>
               Account for <strong>{createdAccount.name}</strong> ({createdAccount.email}) is active and ready to log in immediately.
@@ -382,74 +382,89 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* TAB 2: REPORTS & EXPORT SECTION */}
+        {/* TAB 2: REPORTS & ANALYTICS EXPORT */}
         {activeTab === 'reports' && (
           <div>
-            {/* Filter Form */}
-            <div className="glass-card" style={{ padding: '28px', marginBottom: '32px' }}>
+            <div className="glass-card" style={{ padding: '28px', marginBottom: '36px' }}>
               <h2 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '20px', color: 'var(--text-main)' }}>
-                📊 Filter & Generate Attendance Reports
+                Filter & Generate Attendance Reports
               </h2>
-              <form onSubmit={handleApplyReportFilter} className="form-responsive" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
+
+              <div className="form-responsive" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '20px' }}>
                 <div>
-                  <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>Class Filter</label>
-                  <select className="input-field" value={filterClass} onChange={(e) => setFilterClass(e.target.value)}>
+                  <label style={{ fontSize: '13px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px', fontWeight: '600' }}>Class Filter</label>
+                  <select
+                    className="input-field"
+                    value={reportFilters.classId}
+                    onChange={(e) => setReportFilters({ ...reportFilters, classId: e.target.value })}
+                  >
                     <option value="">All Classes</option>
-                    {classes.map(c => (
+                    {classes.map((c) => (
                       <option key={c._id} value={c._id}>{c.name}</option>
                     ))}
                   </select>
                 </div>
 
                 <div>
-                  <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>Subject Filter</label>
-                  <select className="input-field" value={filterSubject} onChange={(e) => setFilterSubject(e.target.value)}>
+                  <label style={{ fontSize: '13px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px', fontWeight: '600' }}>Subject Filter</label>
+                  <select
+                    className="input-field"
+                    value={reportFilters.subjectId}
+                    onChange={(e) => setReportFilters({ ...reportFilters, subjectId: e.target.value })}
+                  >
                     <option value="">All Subjects</option>
-                    {subjects.map(s => (
+                    {subjects.map((s) => (
                       <option key={s._id} value={s._id}>{s.name}</option>
                     ))}
                   </select>
                 </div>
 
                 <div>
-                  <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>From Date</label>
-                  <input type="date" className="input-field" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                  <label style={{ fontSize: '13px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px', fontWeight: '600' }}>Start Date</label>
+                  <input
+                    type="date"
+                    className="input-field"
+                    value={reportFilters.startDate}
+                    onChange={(e) => setReportFilters({ ...reportFilters, startDate: e.target.value })}
+                  />
                 </div>
 
                 <div>
-                  <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>To Date</label>
-                  <input type="date" className="input-field" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+                  <label style={{ fontSize: '13px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px', fontWeight: '600' }}>End Date</label>
+                  <input
+                    type="date"
+                    className="input-field"
+                    value={reportFilters.endDate}
+                    onChange={(e) => setReportFilters({ ...reportFilters, endDate: e.target.value })}
+                  />
                 </div>
+              </div>
 
-                <div style={{ display: 'flex', alignItems: 'flex-end', gap: '10px' }}>
-                  <button type="submit" className="btn-primary" style={{ height: '48px', width: '100%' }}>
-                    🔍 Filter Report
-                  </button>
-                </div>
-              </form>
-            </div>
-
-            {/* Action Bar: Export CSV & Print */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
-              <h2 style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-main)' }}>
-                Detailed Report Log ({reportRecords.length})
-              </h2>
-
-              <div style={{ display: 'flex', gap: '12px' }}>
+              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                <button
+                  type="button"
+                  onClick={handleApplyReportFilters}
+                  className="btn-primary"
+                  style={{ height: '44px', padding: '0 24px' }}
+                >
+                  Filter Report
+                </button>
+                
                 <button
                   type="button"
                   onClick={handleExportCSV}
                   className="btn-primary"
-                  style={{ background: 'linear-gradient(135deg, #2bd49e 0%, #0d9488 100%)', boxShadow: '0 4px 15px rgba(43, 212, 158, 0.3)' }}
+                  style={{ height: '44px', padding: '0 24px', background: 'linear-gradient(135deg, #2bd49e 0%, #0d9488 100%)' }}
                 >
-                  📥 Export Report to CSV
+                  Export Report to CSV
                 </button>
+
                 <button
                   type="button"
-                  onClick={() => window.print()}
-                  style={{ padding: '12px 20px', borderRadius: '12px', background: 'rgba(255,255,255,0.1)', color: 'var(--text-main)', border: '1px solid var(--border-color)', cursor: 'pointer', fontWeight: '600' }}
+                  onClick={handlePrintReport}
+                  style={{ height: '44px', padding: '0 20px', borderRadius: '12px', background: 'rgba(255,255,255,0.1)', color: 'var(--text-main)', border: '1px solid var(--border-color)', cursor: 'pointer', fontWeight: '600' }}
                 >
-                  🖨️ Print Official Report
+                  Print Official Report
                 </button>
               </div>
             </div>
@@ -811,7 +826,7 @@ export default function AdminPage() {
         {activeTab === 'subjects' && (
           <div>
             <div className="glass-card" style={{ padding: '28px', marginBottom: '36px' }}>
-              <h2 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '20px', color: 'var(--text-main)' }}>📚 Create Subject</h2>
+              <h2 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '20px', color: 'var(--text-main)' }}>Create Subject</h2>
               <form onSubmit={handleCreateSubject} className="form-responsive" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
                 <input
                   type="text"
@@ -862,10 +877,10 @@ export default function AdminPage() {
                         <h3 style={{ fontSize: '16px', fontWeight: '700', color: 'var(--secondary-color)' }}>{sub.name}</h3>
 
                         <p style={{ color: 'var(--text-muted)', fontSize: '12px', marginTop: '4px' }}>
-                          🏫 {sub.classId?.name || 'Unassigned'}
+                          Class: {sub.classId?.name || 'Unassigned'}
                         </p>
                         <p style={{ fontSize: '12px', marginTop: '6px', color: currentTeacher ? 'var(--primary-color)' : 'var(--text-muted)' }}>
-                          👨‍🏫 {currentTeacher ? (currentTeacher.userId?.name || 'Teacher') : 'No teacher assigned'}
+                          Teacher: {currentTeacher ? (currentTeacher.userId?.name || 'Teacher') : 'No teacher assigned'}
                         </p>
 
                         {/* Inline teacher reassign */}
@@ -896,7 +911,7 @@ export default function AdminPage() {
                             onClick={() => setAssigningTeacher({ ...assigningTeacher, [sub._id]: sub.teacherId?._id || sub.teacherId || '' })}
                             style={{ marginTop: '10px', background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '5px 12px', fontSize: '11px', color: 'var(--text-muted)', cursor: 'pointer', width: '100%' }}
                           >
-                            ✏️ {currentTeacher ? 'Change Teacher' : 'Assign Teacher'}
+                            {currentTeacher ? 'Change Teacher' : 'Assign Teacher'}
                           </button>
                         )}
                       </div>
