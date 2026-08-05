@@ -32,7 +32,8 @@ export default function AdminPage() {
   const [newTeacher, setNewTeacher] = useState({ name: '', email: '', phone: '', password: '' });
   const [newStudent, setNewStudent] = useState({ name: '', email: '', rollNo: '', classId: '', guardianPhone: '', password: '' });
   const [newClass, setNewClass] = useState({ name: '', teacherId: '' });
-  const [newSubject, setNewSubject] = useState({ name: '', classId: '' });
+  const [newSubject, setNewSubject] = useState({ name: '', classId: '', teacherId: '' });
+  const [assigningTeacher, setAssigningTeacher] = useState({}); // subjectId → teacherId being set
 
   // Class Edit state
   const [editingClass, setEditingClass] = useState(null);
@@ -258,8 +259,22 @@ export default function AdminPage() {
         method: 'POST',
         body: JSON.stringify(newSubject),
       });
-      setNewSubject({ name: '', classId: '' });
+      setNewSubject({ name: '', classId: '', teacherId: '' });
       setMessage('Subject added successfully!');
+      await loadData();
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const handleAssignTeacher = async (subjectId, teacherId) => {
+    try {
+      await apiClient('/api/admin/subjects', {
+        method: 'PUT',
+        body: JSON.stringify({ id: subjectId, teacherId }),
+      });
+      setMessage('Teacher assigned successfully!');
+      setAssigningTeacher({});
       await loadData();
     } catch (err) {
       setError(err.message);
@@ -796,8 +811,8 @@ export default function AdminPage() {
         {activeTab === 'subjects' && (
           <div>
             <div className="glass-card" style={{ padding: '28px', marginBottom: '36px' }}>
-              <h2 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '20px', color: 'var(--text-main)' }}>Create Subject</h2>
-              <form onSubmit={handleCreateSubject} className="form-responsive" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
+              <h2 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '20px', color: 'var(--text-main)' }}>📚 Create Subject</h2>
+              <form onSubmit={handleCreateSubject} className="form-responsive" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
                 <input
                   type="text"
                   className="input-field"
@@ -812,9 +827,19 @@ export default function AdminPage() {
                   onChange={(e) => setNewSubject({ ...newSubject, classId: e.target.value })}
                   required
                 >
-                  <option value="">Assign to Class</option>
+                  <option value="">— Assign to Class —</option>
                   {classes.map((c) => (
                     <option key={c._id} value={c._id}>{c.name}</option>
+                  ))}
+                </select>
+                <select
+                  className="input-field"
+                  value={newSubject.teacherId}
+                  onChange={(e) => setNewSubject({ ...newSubject, teacherId: e.target.value })}
+                >
+                  <option value="">— Assign Teacher (optional) —</option>
+                  {teachers.map((t) => (
+                    <option key={t._id} value={t._id}>{t.userId?.name || 'Unnamed Teacher'}</option>
                   ))}
                 </select>
                 <button type="submit" className="btn-primary" style={{ height: '48px' }}>
@@ -828,15 +853,54 @@ export default function AdminPage() {
               {subjects.length === 0 ? (
                 <p style={{ color: 'var(--text-muted)' }}>No subjects added yet.</p>
               ) : (
-                <div className="responsive-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '16px' }}>
-                  {subjects.map((sub) => (
-                    <div key={sub._id} style={{ background: 'rgba(15, 23, 42, 0.3)', padding: '18px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
-                      <h3 style={{ fontSize: '18px', fontWeight: '700', color: 'var(--secondary-color)' }}>{sub.name}</h3>
-                      <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginTop: '6px' }}>
-                        Class: {sub.classId?.name || 'Unassigned'}
-                      </p>
-                    </div>
-                  ))}
+                <div className="responsive-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '16px' }}>
+                  {subjects.map((sub) => {
+                    const isAssigning = assigningTeacher[sub._id] !== undefined;
+                    const currentTeacher = teachers.find(t => t._id === (sub.teacherId?._id || sub.teacherId));
+                    return (
+                      <div key={sub._id} style={{ background: 'rgba(15, 23, 42, 0.3)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                        <h3 style={{ fontSize: '16px', fontWeight: '700', color: 'var(--secondary-color)' }}>{sub.name}</h3>
+                        <p style={{ color: 'var(--text-muted)', fontSize: '12px', marginTop: '4px' }}>
+                          🏫 {sub.classId?.name || 'Unassigned'}
+                        </p>
+                        <p style={{ fontSize: '12px', marginTop: '6px', color: currentTeacher ? 'var(--primary-color)' : 'var(--text-muted)' }}>
+                          👨‍🏫 {currentTeacher ? (currentTeacher.userId?.name || 'Teacher') : 'No teacher assigned'}
+                        </p>
+
+                        {/* Inline teacher reassign */}
+                        {isAssigning ? (
+                          <div style={{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+                            <select
+                              className="input-field"
+                              style={{ fontSize: '12px', padding: '6px 10px', flex: 1 }}
+                              value={assigningTeacher[sub._id]}
+                              onChange={(e) => setAssigningTeacher({ ...assigningTeacher, [sub._id]: e.target.value })}
+                            >
+                              <option value="">— Unassign —</option>
+                              {teachers.map((t) => (
+                                <option key={t._id} value={t._id}>{t.userId?.name}</option>
+                              ))}
+                            </select>
+                            <button
+                              onClick={() => handleAssignTeacher(sub._id, assigningTeacher[sub._id])}
+                              style={{ background: '#2bd49e', color: '#000', border: 'none', borderRadius: '8px', padding: '6px 12px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                            >Save</button>
+                            <button
+                              onClick={() => setAssigningTeacher(prev => { const n={...prev}; delete n[sub._id]; return n; })}
+                              style={{ background: 'var(--border-color)', color: 'var(--text-muted)', border: 'none', borderRadius: '8px', padding: '6px 10px', fontSize: '12px', cursor: 'pointer' }}
+                            >✕</button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setAssigningTeacher({ ...assigningTeacher, [sub._id]: sub.teacherId?._id || sub.teacherId || '' })}
+                            style={{ marginTop: '10px', background: 'transparent', border: '1px solid var(--border-color)', borderRadius: '8px', padding: '5px 12px', fontSize: '11px', color: 'var(--text-muted)', cursor: 'pointer', width: '100%' }}
+                          >
+                            ✏️ {currentTeacher ? 'Change Teacher' : 'Assign Teacher'}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

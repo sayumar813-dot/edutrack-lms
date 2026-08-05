@@ -59,7 +59,7 @@ export async function POST(req) {
   if (errorResponse) return errorResponse;
 
   try {
-    const { name, classId } = await req.json();
+    const { name, classId, teacherId } = await req.json();
 
     if (!name || !classId) {
       return Response.json(
@@ -72,7 +72,16 @@ export async function POST(req) {
     const newSubject = await Subject.create({
       name: name.trim(),
       classId,
+      teacherId: teacherId || null,
     });
+
+    // If teacher assigned, add this subject to their subjectsAssigned array
+    if (teacherId) {
+      const Teacher = (await import('@/models/Teacher')).default;
+      await Teacher.findByIdAndUpdate(teacherId, {
+        $addToSet: { subjectsAssigned: newSubject._id },
+      });
+    }
 
     return Response.json({
       success: true,
@@ -84,3 +93,89 @@ export async function POST(req) {
     return Response.json({ error: 'Server error creating subject.' }, { status: 500 });
   }
 }
+
+// PUT /api/admin/subjects - Update subject teacher assignment (Admin only)
+export async function PUT(req) {
+  const { errorResponse } = await authenticateRequest(req, ['admin']);
+  if (errorResponse) return errorResponse;
+
+  try {
+    const { id, teacherId } = await req.json();
+
+    if (!id) {
+      return Response.json({ error: 'Subject ID is required.' }, { status: 400 });
+    }
+
+    await connectToDatabase();
+
+    const existing = await Subject.findById(id);
+    if (!existing) {
+      return Response.json({ error: 'Subject not found.' }, { status: 404 });
+    }
+
+    const Teacher = (await import('@/models/Teacher')).default;
+
+    // Remove subject from old teacher's subjectsAssigned
+    if (existing.teacherId) {
+      await Teacher.findByIdAndUpdate(existing.teacherId, {
+        $pull: { subjectsAssigned: existing._id },
+      });
+    }
+
+    // Assign new teacher
+    const updated = await Subject.findByIdAndUpdate(
+      id,
+      { teacherId: teacherId || null },
+      { new: true }
+    ).populate('classId', 'name');
+
+    // Add subject to new teacher's subjectsAssigned
+    if (teacherId) {
+      await Teacher.findByIdAndUpdate(teacherId, {
+        $addToSet: { subjectsAssigned: updated._id },
+      });
+    }
+
+    return Response.json({
+      success: true,
+      message: 'Teacher assigned to subject successfully.',
+      subject: updated,
+    });
+  } catch (error) {
+    console.error('Update subject teacher error:', error);
+    return Response.json({ error: 'Server error updating subject.' }, { status: 500 });
+  }
+}
+
+// DELETE /api/admin/subjects?id=... - Delete subject (Admin only)
+export async function DELETE(req) {
+  const { errorResponse } = await authenticateRequest(req, ['admin']);
+  if (errorResponse) return errorResponse;
+
+  try {
+    const { searchParams } = new URL(req.url);
+    const subjectId = searchParams.get('id');
+
+    if (!subjectId) {
+      return Response.json({ error: 'Subject ID is required.' }, { status: 400 });
+    }
+
+    await connectToDatabase();
+
+    const subject = await Subject.findById(subjectId);
+    if (subject?.teacherId) {
+      const Teacher = (await import('@/models/Teacher')).default;
+      await Teacher.findByIdAndUpdate(subject.teacherId, {
+        $pull: { subjectsAssigned: subject._id },
+      });
+    }
+
+    await Subject.findByIdAndDelete(subjectId);
+
+    return Response.json({ success: true, message: 'Subject deleted successfully.' });
+  } catch (error) {
+    console.error('Delete subject error:', error);
+    return Response.json({ error: 'Server error deleting subject.' }, { status: 500 });
+  }
+}
+
