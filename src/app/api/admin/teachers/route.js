@@ -3,6 +3,7 @@ import connectToDatabase from '@/lib/db';
 import User from '@/models/User';
 import Teacher from '@/models/Teacher';
 import Class from '@/models/Class';
+import Subject from '@/models/Subject';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 
@@ -40,20 +41,18 @@ export async function POST(req) {
     }
 
     await connectToDatabase();
-    const existingUser = await User.findOne({ email: email.toLowerCase().trim() });
 
+    // Check if email already exists
+    const existingUser = await User.findOne({ email: email.toLowerCase().trim() });
     if (existingUser) {
-      return Response.json(
-        { error: 'A user with this email already exists.' },
-        { status: 400 }
-      );
+      return Response.json({ error: 'An account with this email already exists.' }, { status: 400 });
     }
 
-    // Use custom password if provided, or generate secure 10-character password
-    const finalPassword = password && password.trim() ? password.trim() : crypto.randomBytes(8).toString('hex').slice(0, 10);
-    const passwordHash = await bcrypt.hash(finalPassword, 10);
+    // Determine password: use custom password if provided, or generate random password
+    const tempPassword = password && password.trim() ? password.trim() : `Teach_${crypto.randomBytes(4).toString('hex')}!`;
+    const passwordHash = await bcrypt.hash(tempPassword, 10);
 
-    // Create User record with mustResetPassword: false so they can log in directly and save credentials
+    // Create Base User
     const newUser = await User.create({
       name: name.trim(),
       email: email.toLowerCase().trim(),
@@ -62,10 +61,10 @@ export async function POST(req) {
       mustResetPassword: false,
     });
 
-    // Create Teacher profile
+    // Create Teacher Profile
     const newTeacher = await Teacher.create({
       userId: newUser._id,
-      phone: phone || '',
+      phone: phone ? phone.trim() : '',
       subjectsAssigned: subjectIds || [],
     });
 
@@ -73,7 +72,7 @@ export async function POST(req) {
       success: true,
       message: 'Teacher created successfully.',
       teacher: newTeacher,
-      tempPassword: finalPassword,
+      tempPassword,
     });
   } catch (error) {
     console.error('Create teacher error:', error);
@@ -81,7 +80,7 @@ export async function POST(req) {
   }
 }
 
-// DELETE /api/admin/teachers?id=... - Delete/Revoke teacher account
+// DELETE /api/admin/teachers?id=... - Remove teacher account & immediate session revocation
 export async function DELETE(req) {
   const { errorResponse } = await authenticateRequest(req, ['admin']);
   if (errorResponse) return errorResponse;
@@ -95,17 +94,20 @@ export async function DELETE(req) {
     }
 
     await connectToDatabase();
-    const teacher = await Teacher.findById(teacherId);
-    if (!teacher) {
+
+    const teacherProfile = await Teacher.findById(teacherId);
+    if (!teacherProfile) {
       return Response.json({ error: 'Teacher profile not found.' }, { status: 404 });
     }
 
-    // Unassign teacher from classes
-    await Class.updateMany({ teacherId: teacher._id }, { $set: { teacherId: null } });
+    // Delete base User account (triggers immediate 401 session revocation in auth-middleware)
+    await User.findByIdAndDelete(teacherProfile.userId);
 
-    // Delete User record (triggers immediate session revocation)
-    await User.findByIdAndDelete(teacher.userId);
-    await Teacher.findByIdAndDelete(teacher._id);
+    // Delete Teacher Profile
+    await Teacher.findByIdAndDelete(teacherId);
+
+    // Unassign teacher from any classes
+    await Class.updateMany({ teacherId }, { $set: { teacherId: null } });
 
     return Response.json({
       success: true,
@@ -113,6 +115,6 @@ export async function DELETE(req) {
     });
   } catch (error) {
     console.error('Delete teacher error:', error);
-    return Response.json({ error: 'Server error deleting teacher account.' }, { status: 500 });
+    return Response.json({ error: 'Server error removing teacher.' }, { status: 500 });
   }
 }
