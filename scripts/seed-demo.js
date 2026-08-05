@@ -246,22 +246,40 @@ async function main() {
   const lastNames  = ['Malik', 'Sheikh', 'Raza', 'Butt', 'Khan', 'Qureshi', 'Akhtar', 'Siddiqui'];
   const createdStudents = {};
 
-  for (const cls of createdClasses) {
+  for (let cIdx = 0; cIdx < createdClasses.length; cIdx++) {
+    const cls = createdClasses[cIdx];
     createdStudents[cls._id] = [];
     for (let i = 1; i <= 8; i++) {
-      const firstName = firstNames[(createdStudents[cls._id].length + i) % firstNames.length];
-      const lastName  = lastNames[i % lastNames.length];
+      const fnIdx = (cIdx * 8 + i - 1) % firstNames.length;
+      const lnIdx = (cIdx * 8 + i - 1) % lastNames.length;
+      const firstName = firstNames[fnIdx];
+      const lastName  = lastNames[lnIdx];
       const name  = `${firstName} ${lastName}`;
-      const email = `${firstName.toLowerCase()}.${lastName.toLowerCase()}${i}@demo.edutrack.com`;
+
+      // Guarantee unique email per student across all classes
+      // Primary demo student account is student@demo.edutrack.com
+      const email = (cIdx === 0 && i === 1)
+        ? 'student@demo.edutrack.com'
+        : `${firstName.toLowerCase()}.${lastName.toLowerCase()}${cIdx + 1}${i}@demo.edutrack.com`;
+
       const rollNo = `${cls.name.replace(/[^A-Z0-9]/gi, '').slice(-3).toUpperCase()}-${String(i).padStart(3, '0')}`;
 
       let user = await User.findOne({ email });
       if (!user) {
         user = await User.create({ name, email, passwordHash: defaultPassword, role: 'student', mustResetPassword: false });
+      } else {
+        // Ensure role is student and password is set to defaultPassword
+        user.role = 'student';
+        user.passwordHash = defaultPassword;
+        await user.save();
       }
+
       let student = await Student.findOne({ userId: user._id });
       if (!student) {
         student = await Student.create({ userId: user._id, rollNo, classId: cls._id, guardianPhone: '0300-0000000' });
+      } else {
+        student.classId = cls._id;
+        await student.save();
       }
       createdStudents[cls._id].push(student);
     }
@@ -283,15 +301,11 @@ async function main() {
       const dayOfWeek = new Date(day).getDay();
       if (dayOfWeek === 0 || dayOfWeek === 6) continue;
 
-      // Mark attendance for 2 subjects per day (rotate through subjects)
-      const dayIndex = attendanceDays.indexOf(day);
-      const subjectsForDay = [classSubjects[dayIndex % classSubjects.length], classSubjects[(dayIndex + 1) % classSubjects.length]];
-
-      for (const subject of subjectsForDay) {
+      for (const subject of classSubjects) {
         const existingRecord = await Attendance.findOne({ classId: cls._id, subjectId: subject._id, date: day });
         if (existingRecord) continue;
 
-        // Generate weighted random statuses (80% present, 12% absent, 8% late)
+        // Generate weighted random statuses
         const records = classStudents.map(st => ({
           studentId: st._id,
           status: randomStatus({ present: 78, late: 10, absent: 12 }),

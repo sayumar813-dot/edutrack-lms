@@ -23,11 +23,13 @@ export async function GET(req) {
     // ── 1. STUDENT VIEW ──────────────────────────────────────────────────────
     // Students see ONLY their own personal attendance. Zero class-wide data.
     if (session.role === 'student') {
-      const studentProfile = await Student.findOne({ userId: session.userId });
+      const studentProfile = await Student.findOne({ userId: session.userId }).populate('classId', 'name');
       if (!studentProfile) {
         return Response.json({
           success: true,
+          studentInfo: null,
           stats: { percentage: 0, present: 0, absent: 0, late: 0, total: 0 },
+          subjectBreakdown: [],
           attendanceLog: [],
         });
       }
@@ -41,15 +43,15 @@ export async function GET(req) {
         .sort({ date: -1 });
 
       // Extract this student's specific record from each session
-      const attendanceLog = sessions.map(session => {
-        const record = session.records.find(
+      const attendanceLog = sessions.map(sessionDoc => {
+        const record = sessionDoc.records.find(
           r => r.studentId.toString() === studentProfile._id.toString()
         );
         return {
-          _id: session._id,
-          date: session.date,
-          subjectId: session.subjectId,
-          classId: session.classId,
+          _id: sessionDoc._id,
+          date: sessionDoc.date,
+          subjectId: sessionDoc.subjectId,
+          classId: sessionDoc.classId,
           status: record?.status || 'absent',
         };
       });
@@ -60,12 +62,34 @@ export async function GET(req) {
       const late = attendanceLog.filter(l => l.status === 'late').length;
       const percentage = total > 0 ? Math.round(((present + late) / total) * 100) : 0;
 
+      // Calculate subject-level breakdown
+      const subjectMap = {};
+      attendanceLog.forEach(l => {
+        const subName = l.subjectId?.name || 'General';
+        if (!subjectMap[subName]) {
+          subjectMap[subName] = { subjectName: subName, present: 0, absent: 0, late: 0, total: 0 };
+        }
+        subjectMap[subName][l.status] = (subjectMap[subName][l.status] || 0) + 1;
+        subjectMap[subName].total += 1;
+      });
+
+      const subjectBreakdown = Object.values(subjectMap).map(sub => ({
+        ...sub,
+        percentage: sub.total > 0 ? Math.round(((sub.present + sub.late) / sub.total) * 100) : 0,
+      }));
+
       return Response.json({
         success: true,
+        studentInfo: {
+          rollNo: studentProfile.rollNo,
+          className: studentProfile.classId?.name || 'Unassigned',
+        },
         stats: { percentage, present, absent, late, total },
+        subjectBreakdown,
         attendanceLog,
       });
     }
+
 
     // ── 2. ADMIN & TEACHER VIEW ───────────────────────────────────────────────
     let query = {};
