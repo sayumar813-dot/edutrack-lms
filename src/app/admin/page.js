@@ -858,8 +858,9 @@ export default function AdminPage() {
                     const isAssigning = assigningTeacher[sub._id] !== undefined;
                     const currentTeacher = teachers.find(t => t._id === (sub.teacherId?._id || sub.teacherId));
                     return (
-                      <div key={sub._id} style={{ background: 'rgba(15, 23, 42, 0.3)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                      <div key={sub._id} style={{ background: 'var(--subcard-bg)', padding: '20px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
                         <h3 style={{ fontSize: '16px', fontWeight: '700', color: 'var(--secondary-color)' }}>{sub.name}</h3>
+
                         <p style={{ color: 'var(--text-muted)', fontSize: '12px', marginTop: '4px' }}>
                           🏫 {sub.classId?.name || 'Unassigned'}
                         </p>

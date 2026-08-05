@@ -203,17 +203,17 @@ export default function AnalyticsCharts({ analytics }) {
             {classPerformance.map((c, idx) => {
               const badgeColor = c.rate >= 80 ? '#2bd49e' : c.rate >= 65 ? '#ffb703' : '#ff4d4d';
               return (
-                <div key={idx} style={{ background: 'var(--input-bg)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                <div key={idx} style={{ background: 'var(--subcard-bg)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                     <strong style={{ fontSize: '15px', color: 'var(--text-main)' }}>{c.className}</strong>
-                    <span style={{ background: `${badgeColor}20`, color: badgeColor, border: `1px solid ${badgeColor}40`, padding: '2px 10px', borderRadius: '10px', fontSize: '12px', fontWeight: '700' }}>
+                    <span style={{ background: 'var(--badge-bg)', color: badgeColor, border: `1px solid ${badgeColor}40`, padding: '2px 10px', borderRadius: '10px', fontSize: '12px', fontWeight: '700' }}>
                       {c.rate}% Attendance
                     </span>
                   </div>
 
                   {/* Progress Bar */}
-                  <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.08)', borderRadius: '4px', overflow: 'hidden' }}>
-                    <div style={{ width: `${c.rate}%`, height: '100%', background: badgeColor, borderRadius: '4px', transition: 'width 0.8s ease' }} />
+                  <div style={{ width: '100%', height: '8px', background: 'var(--progress-track)', borderRadius: '4px', overflow: 'hidden' }}>
+                    <div style={{ width: `${c.rate}%`, height: '100%', background: badgeColor, borderRadius: '4px', transition: 'width 0.6s ease' }} />
                   </div>
 
                   <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-muted)', marginTop: '8px' }}>

@@ -11,6 +11,8 @@
     --sidebar-hover-bg: rgba(0, 243, 255, 0.08);
     --bg-color: #050510;
     --card-bg: #1e293b;
+    --subcard-bg: rgba(15, 23, 42, 0.45);
+    --progress-track: rgba(255, 255, 255, 0.1);
     --text-main: #f8fafc;
     --text-muted: #94a3b8;
     --border-color: #334155;
@@ -33,12 +35,14 @@
     --sidebar-hover-bg: rgba(2, 132, 199, 0.08);
     --bg-color: #f8fafc;
     --card-bg: #ffffff;
+    --subcard-bg: #f8fafc; /* Clean light slate background, no dark grey box */
+    --progress-track: rgba(0, 0, 0, 0.08);
     --text-main: #0f172a;
     --text-muted: #64748b;
     --border-color: #e2e8f0;
     --shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
     --shadow-hover: 0 15px 35px rgba(2, 132, 199, 0.25);
-    --glass-bg: rgba(255, 255, 255, 0.85);
+    --glass-bg: rgba(255, 255, 255, 0.9);
     --input-bg: #ffffff;
 }
 
@@ -64,20 +68,35 @@ body {
                       radial-gradient(circle at 90% 80%, rgba(13, 148, 136, 0.06) 0%, transparent 35%);
 }
 
-/* App Responsive Layout Container */
+/* App Responsive Layout Container & Desktop Fixed Sidebar */
 .app-container {
     display: flex;
-    min-height: 100vh;
+    height: 100vh;
+    max-height: 100vh;
+    overflow: hidden;
     background: var(--bg-color);
     width: 100%;
 }
 
+aside.sidebar-desktop {
+    position: relative;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    overflow-y: auto !important;
+    flex-shrink: 0 !important;
+    width: 280px !important;
+    z-index: 100;
+}
+
 .app-main {
     flex: 1;
+    min-width: 0;
+    height: 100vh !important;
+    overflow-y: auto !important;
     padding: 36px 40px;
-    overflow-y: auto;
     width: 100%;
 }
+
 
 /* Glassmorphism Cards */
 .glass-card {

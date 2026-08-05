@@ -118,7 +118,7 @@ export default function StudentPage() {
                 </div>
                 {/* Progress bar */}
                 <div>
-                  <div style={{ width: '100%', height: '6px', background: 'rgba(255, 255, 255, 0.1)', borderRadius: '3px', overflow: 'hidden' }}>
+                  <div style={{ width: '100%', height: '6px', background: 'var(--progress-track)', borderRadius: '3px', overflow: 'hidden' }}>
                     <div style={{ width: `${attendancePct}%`, height: '100%', background: pctColor, transition: 'width 0.6s ease' }} />
                   </div>
                   <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginTop: '6px' }}>
@@ -162,12 +162,12 @@ export default function StudentPage() {
                   {subjectBreakdown.map((sub, idx) => {
                     const subColor = sub.percentage >= 75 ? '#2bd49e' : sub.percentage >= 60 ? '#ffb703' : '#ff4d4d';
                     return (
-                      <div key={idx} style={{ background: 'rgba(15, 23, 42, 0.3)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
+                      <div key={idx} style={{ background: 'var(--subcard-bg)', padding: '16px', borderRadius: '12px', border: '1px solid var(--border-color)' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                           <span style={{ fontWeight: '700', fontSize: '14px', color: 'var(--text-main)' }}>{sub.subjectName}</span>
                           <span style={{ fontWeight: '800', fontSize: '16px', color: subColor }}>{sub.percentage}%</span>
                         </div>
-                        <div style={{ width: '100%', height: '5px', background: 'rgba(255, 255, 255, 0.08)', borderRadius: '3px', overflow: 'hidden', marginBottom: '8px' }}>
+                        <div style={{ width: '100%', height: '5px', background: 'var(--progress-track)', borderRadius: '3px', overflow: 'hidden', marginBottom: '8px' }}>
                           <div style={{ width: `${sub.percentage}%`, height: '100%', background: subColor }} />
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: 'var(--text-muted)' }}>
@@ -182,6 +182,7 @@ export default function StudentPage() {
                 </div>
               </div>
             )}
+
 
             {/* Attendance History Log Table */}
             <div className="glass-card" style={{ padding: '28px' }}>

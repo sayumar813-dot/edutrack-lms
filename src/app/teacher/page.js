@@ -377,8 +377,9 @@ export default function TeacherPage() {
             </h2>
             <div className="responsive-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
               {classes.map((c) => (
-                <div key={c._id} style={{ background: 'var(--input-bg)', padding: '20px', borderRadius: '16px', border: '1px solid var(--border-color)' }}>
+                <div key={c._id} style={{ background: 'var(--subcard-bg)', padding: '20px', borderRadius: '16px', border: '1px solid var(--border-color)' }}>
                   <h3 style={{ fontSize: '20px', fontWeight: '800', color: 'var(--primary-color)', marginBottom: '10px' }}>{c.name}</h3>
+
                   <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)', letterSpacing: '1px', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>
                     Subjects ({c.subjects?.length || 0})
                   </span>
