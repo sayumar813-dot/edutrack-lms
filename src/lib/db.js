@@ -1,5 +1,4 @@
 import mongoose from 'mongoose';
-import dns from 'dns';
 
 let cached = global.mongoose;
 
@@ -14,11 +13,12 @@ async function connectToDatabase() {
     throw new Error('Please define the MONGO_URI environment variable in Vercel Environment Variables or .env.local');
   }
 
-  // Force DNS resolver to public DNS (8.8.8.8) to prevent querySrv ECONNREFUSED
-  try {
-    dns.setServers(['8.8.8.8', '1.1.1.1']);
-  } catch (e) {
-    // Ignore if set fails
+  // Only set custom DNS override on Windows local environment to prevent breaking Vercel Linux Serverless DNS
+  if (process.platform === 'win32') {
+    try {
+      const dns = await import('dns');
+      dns.setServers(['8.8.8.8', '1.1.1.1']);
+    } catch (e) {}
   }
 
   if (cached.conn) {
@@ -28,9 +28,13 @@ async function connectToDatabase() {
   if (!cached.promise) {
     const opts = {
       bufferCommands: false,
-      serverSelectionTimeoutMS: 10000,
-      family: 4, // Force IPv4
+      serverSelectionTimeoutMS: 15000,
     };
+
+    // Apply family: 4 only on Windows
+    if (process.platform === 'win32') {
+      opts.family = 4;
+    }
 
     cached.promise = mongoose.connect(MONGO_URI, opts).then((mongooseInstance) => {
       return mongooseInstance;
