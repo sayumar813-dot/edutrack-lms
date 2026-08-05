@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { apiClient } from '@/services/apiClient';
 import Sidebar from '@/components/Sidebar';
+import AnalyticsCharts from '@/components/AnalyticsCharts';
 
 export default function AdminPage() {
   const { user, loading: authLoading } = useAuth();
@@ -17,7 +18,15 @@ export default function AdminPage() {
   const [students, setStudents] = useState([]);
   const [classes, setClasses] = useState([]);
   const [subjects, setSubjects] = useState([]);
+  const [analytics, setAnalytics] = useState(null);
+  const [reportRecords, setReportRecords] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // Report Filter states
+  const [filterClass, setFilterClass] = useState('');
+  const [filterSubject, setFilterSubject] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   // Form states
   const [newTeacher, setNewTeacher] = useState({ name: '', email: '', phone: '', password: '' });
@@ -26,10 +35,10 @@ export default function AdminPage() {
   const [newSubject, setNewSubject] = useState({ name: '', classId: '' });
 
   // Class Edit state
-  const [editingClass, setEditingClass] = useState(null); // { id, name, teacherId }
+  const [editingClass, setEditingClass] = useState(null);
 
   // Modal & Alert states
-  const [createdAccount, setCreatedAccount] = useState(null); // { role, name, email, tempPassword }
+  const [createdAccount, setCreatedAccount] = useState(null);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
@@ -46,22 +55,71 @@ export default function AdminPage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [tData, sData, cData, subData] = await Promise.all([
+      const [tData, sData, cData, subData, summaryRes] = await Promise.all([
         apiClient('/api/admin/teachers'),
         apiClient('/api/admin/students'),
         apiClient('/api/admin/classes'),
         apiClient('/api/admin/subjects'),
+        apiClient('/api/attendance/summary'),
       ]);
 
       setTeachers(tData.teachers || []);
       setStudents(sData.students || []);
       setClasses(cData.classes || []);
       setSubjects(subData.subjects || []);
+      setAnalytics(summaryRes.analytics || null);
+      setReportRecords(summaryRes.records || []);
     } catch (err) {
       setError(err.message);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleApplyReportFilter = async (e) => {
+    e?.preventDefault();
+    try {
+      setLoading(true);
+      let queryUrl = '/api/attendance/summary?';
+      if (filterClass) queryUrl += `classId=${filterClass}&`;
+      if (filterSubject) queryUrl += `subjectId=${filterSubject}&`;
+      if (startDate) queryUrl += `startDate=${startDate}&`;
+      if (endDate) queryUrl += `endDate=${endDate}&`;
+
+      const summaryRes = await apiClient(queryUrl);
+      setAnalytics(summaryRes.analytics || null);
+      setReportRecords(summaryRes.records || []);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleExportCSV = () => {
+    if (!reportRecords || reportRecords.length === 0) {
+      alert('No attendance report records available to export.');
+      return;
+    }
+
+    const headers = ['Date', 'Student Name', 'Roll No', 'Class', 'Subject', 'Status'];
+    const rows = reportRecords.map(r => [
+      new Date(r.date).toISOString().split('T')[0],
+      `"${r.studentId?.userId?.name || 'N/A'}"`,
+      `"${r.studentId?.rollNo || 'N/A'}"`,
+      `"${r.classId?.name || 'N/A'}"`,
+      `"${r.subjectId?.name || 'N/A'}"`,
+      r.status,
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `Attendance_Report_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handleCreateTeacher = async (e) => {
@@ -213,7 +271,7 @@ export default function AdminPage() {
       <div style={{ display: 'flex', minHeight: '100vh', justifyContent: 'center', alignItems: 'center', background: 'var(--bg-color)' }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{ width: '50px', height: '50px', border: '3px solid var(--border-color)', borderTopColor: 'var(--primary-color)', borderRadius: '50%', animation: 'spin 1s linear infinite', margin: '0 auto 16px' }} />
-          <p style={{ color: 'var(--text-muted)' }}>Loading Admin Portal...</p>
+          <p style={{ color: 'var(--text-muted)' }}>Loading Admin Portal & Real-time Analytics...</p>
         </div>
       </div>
     );
@@ -229,10 +287,10 @@ export default function AdminPage() {
         <div className="page-header-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '36px' }}>
           <div>
             <h1 style={{ fontSize: '30px', fontWeight: '800', color: 'var(--text-main)' }}>
-              Admin Dashboard
+              Admin Dashboard & Analytics
             </h1>
             <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
-              Academy Management & System Control
+              Academy Management, Real-Time Graphs & Reports Control
             </p>
           </div>
 
@@ -281,10 +339,11 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* TAB 1: OVERVIEW DASHBOARD */}
+        {/* TAB 1: OVERVIEW DASHBOARD WITH REAL-TIME GRAPHS */}
         {activeTab === 'dashboard' && (
           <div>
-            <div className="responsive-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '40px' }}>
+            {/* Real-time Summary Cards */}
+            <div className="responsive-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '32px' }}>
               <div className="glass-card" style={{ padding: '24px', textAlign: 'center' }}>
                 <h3 style={{ fontSize: '36px', color: 'var(--primary-color)', fontWeight: '700' }}>{teachers.length}</h3>
                 <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginTop: '4px' }}>Total Teachers</p>
@@ -302,10 +361,131 @@ export default function AdminPage() {
                 <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginTop: '4px' }}>Total Subjects</p>
               </div>
             </div>
+
+            {/* REAL-TIME VISUAL GRAPH CHARTS COMPONENT */}
+            <AnalyticsCharts analytics={analytics} />
           </div>
         )}
 
-        {/* TAB 2: MANAGE TEACHERS */}
+        {/* TAB 2: REPORTS & EXPORT SECTION */}
+        {activeTab === 'reports' && (
+          <div>
+            {/* Filter Form */}
+            <div className="glass-card" style={{ padding: '28px', marginBottom: '32px' }}>
+              <h2 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '20px', color: 'var(--text-main)' }}>
+                📊 Filter & Generate Attendance Reports
+              </h2>
+              <form onSubmit={handleApplyReportFilter} className="form-responsive" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px' }}>
+                <div>
+                  <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>Class Filter</label>
+                  <select className="input-field" value={filterClass} onChange={(e) => setFilterClass(e.target.value)}>
+                    <option value="">All Classes</option>
+                    {classes.map(c => (
+                      <option key={c._id} value={c._id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>Subject Filter</label>
+                  <select className="input-field" value={filterSubject} onChange={(e) => setFilterSubject(e.target.value)}>
+                    <option value="">All Subjects</option>
+                    {subjects.map(s => (
+                      <option key={s._id} value={s._id}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>From Date</label>
+                  <input type="date" className="input-field" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>To Date</label>
+                  <input type="date" className="input-field" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'flex-end', gap: '10px' }}>
+                  <button type="submit" className="btn-primary" style={{ height: '48px', width: '100%' }}>
+                    🔍 Filter Report
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* Action Bar: Export CSV & Print */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+              <h2 style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-main)' }}>
+                Detailed Report Log ({reportRecords.length})
+              </h2>
+
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button
+                  type="button"
+                  onClick={handleExportCSV}
+                  className="btn-primary"
+                  style={{ background: 'linear-gradient(135deg, #2bd49e 0%, #0d9488 100%)', boxShadow: '0 4px 15px rgba(43, 212, 158, 0.3)' }}
+                >
+                  📥 Export Report to CSV
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  style={{ padding: '12px 20px', borderRadius: '12px', background: 'rgba(255,255,255,0.1)', color: 'var(--text-main)', border: '1px solid var(--border-color)', cursor: 'pointer', fontWeight: '600' }}
+                >
+                  🖨️ Print Official Report
+                </button>
+              </div>
+            </div>
+
+            {/* Real-time Visual Charts inside Report View */}
+            <AnalyticsCharts analytics={analytics} />
+
+            {/* Reports Data Log Table */}
+            <div className="glass-card" style={{ padding: '28px' }}>
+              {reportRecords.length === 0 ? (
+                <p style={{ color: 'var(--text-muted)' }}>No attendance records match the selected filters.</p>
+              ) : (
+                <div className="table-responsive">
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '14px' }}>
+                        <th style={{ padding: '12px' }}>Date</th>
+                        <th style={{ padding: '12px' }}>Student</th>
+                        <th style={{ padding: '12px' }}>Roll No</th>
+                        <th style={{ padding: '12px' }}>Class</th>
+                        <th style={{ padding: '12px' }}>Subject</th>
+                        <th style={{ padding: '12px', textAlign: 'right' }}>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {reportRecords.map((r) => {
+                        const statusColor = r.status === 'present' ? '#2bd49e' : r.status === 'absent' ? '#ff4d4d' : '#ffb703';
+                        return (
+                          <tr key={r._id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                            <td style={{ padding: '14px 12px', fontWeight: '600' }}>{new Date(r.date).toISOString().split('T')[0]}</td>
+                            <td style={{ padding: '14px 12px', fontWeight: '600', color: 'var(--text-main)' }}>{r.studentId?.userId?.name || 'Student'}</td>
+                            <td style={{ padding: '14px 12px', color: 'var(--primary-color)', fontWeight: '700' }}>{r.studentId?.rollNo || 'N/A'}</td>
+                            <td style={{ padding: '14px 12px', color: 'var(--text-muted)' }}>{r.classId?.name || 'N/A'}</td>
+                            <td style={{ padding: '14px 12px', color: 'var(--text-muted)' }}>{r.subjectId?.name || 'N/A'}</td>
+                            <td style={{ padding: '14px 12px', textAlign: 'right' }}>
+                              <span style={{ background: `${statusColor}20`, color: statusColor, border: `1px solid ${statusColor}40`, padding: '4px 12px', borderRadius: '8px', fontSize: '13px', fontWeight: '600', textTransform: 'capitalize' }}>
+                                {r.status}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: MANAGE TEACHERS */}
         {activeTab === 'teachers' && (
           <div>
             <div className="glass-card" style={{ padding: '28px', marginBottom: '36px' }}>
@@ -399,7 +579,7 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* TAB 3: MANAGE STUDENTS */}
+        {/* TAB 4: MANAGE STUDENTS */}
         {activeTab === 'students' && (
           <div>
             <div className="glass-card" style={{ padding: '28px', marginBottom: '36px' }}>
@@ -510,7 +690,7 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* TAB 4: MANAGE CLASSES */}
+        {/* TAB 5: MANAGE CLASSES */}
         {activeTab === 'classes' && (
           <div>
             {/* Create or Edit Class Form */}
@@ -612,7 +792,7 @@ export default function AdminPage() {
           </div>
         )}
 
-        {/* TAB 5: MANAGE SUBJECTS */}
+        {/* TAB 6: MANAGE SUBJECTS */}
         {activeTab === 'subjects' && (
           <div>
             <div className="glass-card" style={{ padding: '28px', marginBottom: '36px' }}>

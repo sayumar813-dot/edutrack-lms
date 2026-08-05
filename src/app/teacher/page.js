@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { apiClient } from '@/services/apiClient';
 import Sidebar from '@/components/Sidebar';
+import AnalyticsCharts from '@/components/AnalyticsCharts';
 
 export default function TeacherPage() {
   const { user, loading: authLoading } = useAuth();
@@ -15,45 +16,45 @@ export default function TeacherPage() {
   const [activeTab, setActiveTab] = useState('attendance');
   const [classes, setClasses] = useState([]);
   const [subjects, setSubjects] = useState([]);
+  const [students, setStudents] = useState([]);
+  const [analytics, setAnalytics] = useState(null);
+
+  // Form & Filter state
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedSubject, setSelectedSubject] = useState('');
-  const [students, setStudents] = useState([]);
   const [attendanceDate, setAttendanceDate] = useState(new Date().toISOString().split('T')[0]);
-  const [attendanceSheet, setAttendanceSheet] = useState({}); // { studentId: 'present'|'absent'|'late' }
+  const [attendanceData, setAttendanceData] = useState({});
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
 
   useEffect(() => {
     if (!authLoading) {
-      if (!user || (user.role !== 'teacher' && user.role !== 'admin')) {
+      if (!user || user.role !== 'teacher') {
         router.push('/');
       } else {
-        loadInitialData();
+        loadTeacherData();
       }
     }
   }, [user, authLoading, router]);
 
-  const loadInitialData = async () => {
+  const loadTeacherData = async () => {
     try {
       setLoading(true);
-      const [cData, subData, sData] = await Promise.all([
+      const [cData, subData, summaryRes] = await Promise.all([
         apiClient('/api/admin/classes'),
         apiClient('/api/admin/subjects'),
-        apiClient('/api/admin/students'),
+        apiClient('/api/attendance/summary'),
       ]);
 
-      const fetchedClasses = cData.classes || [];
-      const fetchedSubjects = subData.subjects || [];
+      setClasses(cData.classes || []);
+      setSubjects(subData.subjects || []);
+      setAnalytics(summaryRes.analytics || null);
 
-      setClasses(fetchedClasses);
-      setSubjects(fetchedSubjects);
-      setStudents(sData.students || []);
-
-      if (fetchedClasses.length > 0) {
-        setSelectedClass(fetchedClasses[0]._id);
+      if (cData.classes && cData.classes.length > 0) {
+        setSelectedClass(cData.classes[0]._id);
       }
     } catch (err) {
       setError(err.message);
@@ -62,47 +63,59 @@ export default function TeacherPage() {
     }
   };
 
-  const classStudents = students.filter(s => {
-    if (!selectedClass) return false;
-    const sClassId = s.classId?._id ? s.classId._id.toString() : s.classId?.toString();
-    return sClassId === selectedClass.toString();
-  });
+  useEffect(() => {
+    if (selectedClass) {
+      loadStudentsAndSubjects(selectedClass);
+    }
+  }, [selectedClass]);
 
-  const filteredSubjects = subjects.filter(sub => {
-    if (!selectedClass) return false;
-    const subClassId = sub.classId?._id ? sub.classId._id.toString() : sub.classId?.toString();
-    return subClassId === selectedClass.toString();
-  });
+  const loadStudentsAndSubjects = async (classId) => {
+    try {
+      const [sData, attData] = await Promise.all([
+        apiClient(`/api/admin/students?classId=${classId}`),
+        selectedSubject
+          ? apiClient(`/api/attendance?classId=${classId}&subjectId=${selectedSubject}&date=${attendanceDate}`)
+          : Promise.resolve({ records: [] }),
+      ]);
+
+      setStudents(sData.students || []);
+
+      const initialAttendance = {};
+      (sData.students || []).forEach((st) => {
+        const existingRecord = (attData.records || []).find((r) => r.studentId._id === st._id || r.studentId === st._id);
+        initialAttendance[st._id] = existingRecord ? existingRecord.status : 'present';
+      });
+
+      setAttendanceData(initialAttendance);
+    } catch (err) {
+      console.error('Error loading students:', err);
+    }
+  };
 
   const handleStatusChange = (studentId, status) => {
-    setAttendanceSheet(prev => ({
+    setAttendanceData((prev) => ({
       ...prev,
       [studentId]: status,
     }));
   };
 
-  const handleSaveAttendance = async (e) => {
+  const handleSubmitAttendance = async (e) => {
     e.preventDefault();
+    if (!selectedClass || !selectedSubject || !attendanceDate) {
+      setError('Please select a class, subject, and date.');
+      return;
+    }
+
+    setSubmitting(true);
     setError('');
     setMessage('');
 
-    if (!selectedClass || !selectedSubject) {
-      setError('Please select both a class and a subject.');
-      return;
-    }
-
-    if (classStudents.length === 0) {
-      setError('No enrolled students found in this class.');
-      return;
-    }
-
-    const records = classStudents.map(student => ({
-      studentId: student._id,
-      status: attendanceSheet[student._id] || 'present',
-    }));
-
-    setSubmitting(true);
     try {
+      const records = Object.keys(attendanceData).map((studentId) => ({
+        studentId,
+        status: attendanceData[studentId],
+      }));
+
       await apiClient('/api/attendance', {
         method: 'POST',
         body: JSON.stringify({
@@ -113,11 +126,47 @@ export default function TeacherPage() {
         }),
       });
 
-      setMessage(`Attendance saved successfully for ${attendanceDate}!`);
+      setMessage('Attendance submitted and updated successfully!');
+      
+      // Refresh teacher real-time analytics
+      const summaryRes = await apiClient('/api/attendance/summary');
+      setAnalytics(summaryRes.analytics || null);
     } catch (err) {
       setError(err.message);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleExportCSV = async () => {
+    try {
+      const summaryRes = await apiClient(`/api/attendance/summary?classId=${selectedClass}`);
+      const records = summaryRes.records || [];
+
+      if (records.length === 0) {
+        alert('No attendance records to export for this class.');
+        return;
+      }
+
+      const headers = ['Date', 'Student Name', 'Roll No', 'Subject', 'Status'];
+      const rows = records.map((r) => [
+        new Date(r.date).toISOString().split('T')[0],
+        `"${r.studentId?.userId?.name || 'N/A'}"`,
+        `"${r.studentId?.rollNo || 'N/A'}"`,
+        `"${r.subjectId?.name || 'N/A'}"`,
+        r.status,
+      ]);
+
+      const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement('a');
+      link.setAttribute('href', encodedUri);
+      link.setAttribute('download', `Teacher_Attendance_Report_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      alert('Failed to export CSV: ' + err.message);
     }
   };
 
@@ -132,6 +181,13 @@ export default function TeacherPage() {
     );
   }
 
+  // Filter subjects for the selected class
+  const classSubjects = subjects.filter((sub) => {
+    if (!sub.classId) return false;
+    const subClassId = typeof sub.classId === 'object' ? sub.classId._id : sub.classId;
+    return subClassId?.toString() === selectedClass?.toString();
+  });
+
   return (
     <div className="app-container">
       <Sidebar activeTab={activeTab} setActiveTab={setActiveTab} />
@@ -145,11 +201,10 @@ export default function TeacherPage() {
               Teacher Portal
             </h1>
             <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
-              Welcome back, <strong>{user?.name}</strong>!
+              Attendance Marking, Real-Time Class Analytics & Reports
             </p>
           </div>
 
-          {/* Top Right Permanent Theme Toggle */}
           <button
             type="button"
             onClick={toggleTheme}
@@ -174,23 +229,16 @@ export default function TeacherPage() {
 
         {/* TAB 1: MARK ATTENDANCE */}
         {activeTab === 'attendance' && (
-          <div className="glass-card" style={{ padding: '28px' }}>
-            <h2 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '20px', color: 'var(--text-main)' }}>Mark Today's Attendance</h2>
+          <div>
+            <div className="glass-card" style={{ padding: '28px', marginBottom: '32px' }}>
+              <h2 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '20px', color: 'var(--text-main)' }}>
+                Select Class, Subject & Date
+              </h2>
 
-            <form onSubmit={handleSaveAttendance}>
-              <div className="form-responsive" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+              <div className="form-responsive" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
                 <div>
-                  <label style={{ fontSize: '13px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>Select Assigned Class</label>
-                  <select
-                    className="input-field"
-                    value={selectedClass}
-                    onChange={(e) => {
-                      setSelectedClass(e.target.value);
-                      setSelectedSubject('');
-                    }}
-                    required
-                  >
-                    <option value="">-- Choose Class --</option>
+                  <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>Class</label>
+                  <select className="input-field" value={selectedClass} onChange={(e) => setSelectedClass(e.target.value)}>
                     {classes.map((c) => (
                       <option key={c._id} value={c._id}>{c.name}</option>
                     ))}
@@ -198,105 +246,118 @@ export default function TeacherPage() {
                 </div>
 
                 <div>
-                  <label style={{ fontSize: '13px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>Select Subject</label>
-                  <select
-                    className="input-field"
-                    value={selectedSubject}
-                    onChange={(e) => setSelectedSubject(e.target.value)}
-                    disabled={!selectedClass || filteredSubjects.length === 0}
-                    required
-                  >
-                    <option value="">
-                      {filteredSubjects.length === 0 ? '-- No Subjects Found for Class --' : '-- Choose Subject --'}
-                    </option>
-                    {filteredSubjects.map((sub) => (
+                  <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>Subject</label>
+                  <select className="input-field" value={selectedSubject} onChange={(e) => setSelectedSubject(e.target.value)}>
+                    <option value="">Select Subject</option>
+                    {classSubjects.map((sub) => (
                       <option key={sub._id} value={sub._id}>{sub.name}</option>
                     ))}
                   </select>
                 </div>
 
                 <div>
-                  <label style={{ fontSize: '13px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>Attendance Date</label>
-                  <input
-                    type="date"
-                    className="input-field"
-                    value={attendanceDate}
-                    onChange={(e) => setAttendanceDate(e.target.value)}
-                    required
-                  />
+                  <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>Date</label>
+                  <input type="date" className="input-field" value={attendanceDate} onChange={(e) => setAttendanceDate(e.target.value)} />
                 </div>
               </div>
+            </div>
 
-              {selectedClass && (
-                <div>
-                  <h3 style={{ fontSize: '16px', fontWeight: '700', marginBottom: '14px', color: 'var(--text-main)' }}>
-                    Student Roster ({classStudents.length})
-                  </h3>
+            {/* Student Attendance Marking Roster */}
+            <div className="glass-card" style={{ padding: '28px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
+                <h2 style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-main)' }}>
+                  Student Attendance Roster ({students.length})
+                </h2>
 
-                  {classStudents.length === 0 ? (
-                    <p style={{ color: 'var(--text-muted)', fontStyle: 'italic', padding: '12px', background: 'var(--input-bg)', borderRadius: '10px' }}>
-                      No students currently enrolled in this class.
-                    </p>
-                  ) : (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '24px' }}>
-                      {classStudents.map((s) => {
-                        const currentStatus = attendanceSheet[s._id] || 'present';
+                <button
+                  onClick={handleSubmitAttendance}
+                  disabled={submitting || students.length === 0}
+                  className="btn-primary"
+                  style={{ background: 'linear-gradient(135deg, #2bd49e 0%, #0d9488 100%)' }}
+                >
+                  {submitting ? 'Submitting...' : '💾 Submit Attendance'}
+                </button>
+              </div>
+
+              {students.length === 0 ? (
+                <p style={{ color: 'var(--text-muted)' }}>No students found in the selected class.</p>
+              ) : (
+                <div className="table-responsive">
+                  <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '14px' }}>
+                        <th style={{ padding: '12px' }}>Roll No</th>
+                        <th style={{ padding: '12px' }}>Student Name</th>
+                        <th style={{ padding: '12px', textAlign: 'right' }}>Attendance Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {students.map((st) => {
+                        const currentStatus = attendanceData[st._id] || 'present';
                         return (
-                          <div
-                            key={s._id}
-                            style={{
-                              display: 'flex',
-                              justifyContent: 'space-between',
-                              alignItems: 'center',
-                              background: 'var(--input-bg)',
-                              padding: '12px 18px',
-                              borderRadius: '12px',
-                              border: '1px solid var(--border-color)',
-                            }}
-                          >
-                            <div>
-                              <strong style={{ fontSize: '15px', color: 'var(--text-main)' }}>{s.userId?.name || 'Student'}</strong>
-                              <span style={{ fontSize: '12px', color: 'var(--text-muted)', marginLeft: '12px' }}>Roll #{s.rollNo}</span>
-                            </div>
-
-                            <div style={{ display: 'flex', gap: '8px' }}>
-                              {['present', 'absent', 'late'].map((st) => (
+                          <tr key={st._id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                            <td style={{ padding: '14px 12px', fontWeight: '700', color: 'var(--primary-color)' }}>{st.rollNo}</td>
+                            <td style={{ padding: '14px 12px', fontWeight: '600' }}>{st.userId?.name || 'Student'}</td>
+                            <td style={{ padding: '14px 12px', textAlign: 'right' }}>
+                              <div style={{ display: 'inline-flex', gap: '8px', background: 'var(--input-bg)', padding: '4px', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
                                 <button
-                                  key={st}
                                   type="button"
-                                  onClick={() => handleStatusChange(s._id, st)}
+                                  onClick={() => handleStatusChange(st._id, 'present')}
                                   style={{
                                     padding: '6px 14px',
                                     borderRadius: '8px',
                                     border: 'none',
-                                    textTransform: 'capitalize',
-                                    fontWeight: '600',
-                                    fontSize: '13px',
                                     cursor: 'pointer',
-                                    background:
-                                      currentStatus === st
-                                        ? st === 'present' ? '#2bd49e' : st === 'absent' ? '#ff4d4d' : '#ffb703'
-                                        : 'rgba(255,255,255,0.08)',
-                                    color: currentStatus === st ? '#ffffff' : 'var(--text-muted)',
-                                    transition: 'var(--transition)',
+                                    fontWeight: '700',
+                                    fontSize: '13px',
+                                    background: currentStatus === 'present' ? '#2bd49e' : 'transparent',
+                                    color: currentStatus === 'present' ? '#ffffff' : 'var(--text-muted)',
                                   }}
                                 >
-                                  {st}
+                                  Present
                                 </button>
-                              ))}
-                            </div>
-                          </div>
+                                <button
+                                  type="button"
+                                  onClick={() => handleStatusChange(st._id, 'late')}
+                                  style={{
+                                    padding: '6px 14px',
+                                    borderRadius: '8px',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    fontWeight: '700',
+                                    fontSize: '13px',
+                                    background: currentStatus === 'late' ? '#ffb703' : 'transparent',
+                                    color: currentStatus === 'late' ? '#000000' : 'var(--text-muted)',
+                                  }}
+                                >
+                                  Late
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleStatusChange(st._id, 'absent')}
+                                  style={{
+                                    padding: '6px 14px',
+                                    borderRadius: '8px',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    fontWeight: '700',
+                                    fontSize: '13px',
+                                    background: currentStatus === 'absent' ? '#ff4d4d' : 'transparent',
+                                    color: currentStatus === 'absent' ? '#ffffff' : 'var(--text-muted)',
+                                  }}
+                                >
+                                  Absent
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
                         );
                       })}
-                    </div>
-                  )}
-
-                  <button type="submit" className="btn-primary" disabled={submitting || classStudents.length === 0}>
-                    {submitting ? 'Saving...' : '💾 Save Attendance Sheet'}
-                  </button>
+                    </tbody>
+                  </table>
                 </div>
               )}
-            </form>
+            </div>
           </div>
         )}
 
@@ -304,47 +365,61 @@ export default function TeacherPage() {
         {activeTab === 'subjects' && (
           <div className="glass-card" style={{ padding: '28px' }}>
             <h2 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '20px', color: 'var(--text-main)' }}>
-              My Assigned Classes & Subjects ({classes.length})
+              Assigned Classes & Subjects Directory
             </h2>
-
-            {classes.length === 0 ? (
-              <p style={{ color: 'var(--text-muted)' }}>You are not assigned to any classes yet.</p>
-            ) : (
-              <div className="responsive-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
-                {classes.map((c) => {
-                  const cSubs = subjects.filter(sub => {
-                    const subClassId = sub.classId?._id ? sub.classId._id.toString() : sub.classId?.toString();
-                    return subClassId === c._id.toString();
-                  });
-
-                  return (
-                    <div key={c._id} style={{ background: 'var(--input-bg)', padding: '20px', borderRadius: '16px', border: '1px solid var(--border-color)' }}>
-                      <h3 style={{ fontSize: '20px', fontWeight: '800', color: 'var(--primary-color)', marginBottom: '10px' }}>{c.name}</h3>
-                      <p style={{ color: 'var(--text-muted)', fontSize: '13px', marginBottom: '14px' }}>
-                        Enrolled Students: <strong>{students.filter(s => (s.classId?._id || s.classId)?.toString() === c._id.toString()).length}</strong>
-                      </p>
-
-                      <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '12px' }}>
-                        <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)', letterSpacing: '1px', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>
-                          Class Subjects ({cSubs.length})
+            <div className="responsive-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
+              {classes.map((c) => (
+                <div key={c._id} style={{ background: 'var(--input-bg)', padding: '20px', borderRadius: '16px', border: '1px solid var(--border-color)' }}>
+                  <h3 style={{ fontSize: '20px', fontWeight: '800', color: 'var(--primary-color)', marginBottom: '10px' }}>{c.name}</h3>
+                  <span style={{ fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)', letterSpacing: '1px', textTransform: 'uppercase', display: 'block', marginBottom: '8px' }}>
+                    Subjects ({c.subjects?.length || 0})
+                  </span>
+                  {c.subjects && c.subjects.length > 0 ? (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                      {c.subjects.map((sub, idx) => (
+                        <span key={idx} style={{ background: 'rgba(0, 243, 255, 0.12)', color: 'var(--primary-color)', padding: '4px 10px', borderRadius: '12px', fontSize: '12px', fontWeight: '600', border: '1px solid rgba(0, 243, 255, 0.25)' }}>
+                          📚 {sub}
                         </span>
-                        {cSubs.length > 0 ? (
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                            {cSubs.map((sub) => (
-                              <span key={sub._id} style={{ background: 'rgba(0, 243, 255, 0.12)', color: 'var(--primary-color)', padding: '6px 12px', borderRadius: '12px', fontSize: '13px', fontWeight: '600', border: '1px solid rgba(0, 243, 255, 0.25)' }}>
-                                📚 {sub.name}
-                              </span>
-                            ))}
-                          </div>
-                        ) : (
-                          <p style={{ fontSize: '13px', color: 'var(--text-muted)', fontStyle: 'italic' }}>No subjects added to this class yet.</p>
-                        )}
-                      </div>
+                      ))}
                     </div>
-                  );
-                })}
+                  ) : (
+                    <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>No subjects assigned</span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: CLASS REPORTS & CSV EXPORT */}
+        {activeTab === 'reports' && (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+              <h2 style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-main)' }}>
+                Real-Time Class Attendance Analytics & Export
+              </h2>
+
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button
+                  type="button"
+                  onClick={handleExportCSV}
+                  className="btn-primary"
+                  style={{ background: 'linear-gradient(135deg, #2bd49e 0%, #0d9488 100%)' }}
+                >
+                  📥 Export Class Report to CSV
+                </button>
+                <button
+                  type="button"
+                  onClick={() => window.print()}
+                  style={{ padding: '12px 20px', borderRadius: '12px', background: 'rgba(255,255,255,0.1)', color: 'var(--text-main)', border: '1px solid var(--border-color)', cursor: 'pointer', fontWeight: '600' }}
+                >
+                  🖨️ Print Report
+                </button>
               </div>
-            )}
+            </div>
+
+            {/* Real-time SVG Visual Charts */}
+            <AnalyticsCharts analytics={analytics} />
           </div>
         )}
 

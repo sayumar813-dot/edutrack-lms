@@ -132,11 +132,12 @@ export default function Sidebar({ activeTab, setActiveTab }) {
           {user?.role === 'admin' && (
             <nav style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {[
-                { id: 'dashboard', label: 'Dashboard', icon: '📊' },
+                { id: 'dashboard', label: 'Dashboard & Graphs', icon: '📊' },
                 { id: 'teachers', label: 'Manage Teachers', icon: '👨‍🏫' },
                 { id: 'students', label: 'Manage Students', icon: '🎓' },
                 { id: 'classes', label: 'Manage Classes', icon: '🏫' },
                 { id: 'subjects', label: 'Manage Subjects', icon: '📚' },
+                { id: 'reports', label: 'Reports & Export', icon: '📄' },
               ].map((item) => (
                 <button
                   key={item.id}
@@ -155,7 +156,7 @@ export default function Sidebar({ activeTab, setActiveTab }) {
               {[
                 { id: 'attendance', label: 'Mark Attendance', icon: '📝' },
                 { id: 'subjects', label: 'My Classes & Subjects', icon: '📚' },
-                { id: 'summary', label: 'Attendance History', icon: '📈' },
+                { id: 'reports', label: 'Class Reports & CSV', icon: '📈' },
               ].map((item) => (
                 <button
                   key={item.id}

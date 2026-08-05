@@ -15,11 +15,22 @@ export async function GET(req) {
   try {
     await connectToDatabase();
 
+    const { searchParams } = new URL(req.url);
+    const classIdFilter = searchParams.get('classId');
+
     // Teacher Scoping: Only see students enrolled in classes assigned to this teacher
     if (session.role === 'teacher') {
       const teacherProfile = await Teacher.findOne({ userId: session.userId });
       if (!teacherProfile) {
         return Response.json({ success: true, students: [] });
+      }
+
+      // If a specific classId is requested, filter to that class (within teacher's scope)
+      if (classIdFilter) {
+        const students = await Student.find({ classId: classIdFilter })
+          .populate('userId', 'name email role createdAt')
+          .populate('classId', 'name');
+        return Response.json({ success: true, students });
       }
 
       const assignedClasses = await Class.find({ teacherId: teacherProfile._id }).select('_id');
@@ -32,8 +43,9 @@ export async function GET(req) {
       return Response.json({ success: true, students });
     }
 
-    // Admin Scoping: Full view of all students
-    const students = await Student.find()
+    // Admin Scoping: Full view, with optional classId filter
+    const query = classIdFilter ? { classId: classIdFilter } : {};
+    const students = await Student.find(query)
       .populate('userId', 'name email role createdAt')
       .populate('classId', 'name');
 
