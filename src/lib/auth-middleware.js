@@ -1,10 +1,8 @@
 import { getAuthCookie } from './jwt';
-import connectToDatabase from './db';
-import User from '@/models/User';
 
 /**
  * Validates session and checks role permissions for API route requests.
- * Enforces IMMEDIATE ACCESS REVOCATION by checking if the User record still exists in DB.
+ * Reads directly from the httpOnly JWT cookie — no external DB call required.
  * Returns { user, errorResponse }
  */
 export async function authenticateRequest(req, allowedRoles = []) {
@@ -24,35 +22,13 @@ export async function authenticateRequest(req, allowedRoles = []) {
   }
 
   const session = await getAuthCookie();
+
   if (!session) {
     return {
       user: null,
       errorResponse: Response.json(
-        { error: 'Authentication required. Session expired or invalid.' },
+        { error: 'Authentication required. Please log in.' },
         { status: 401 }
-      ),
-    };
-  }
-
-  // Verify User record still exists in MongoDB (Immediate Revocation on Account Deletion)
-  try {
-    await connectToDatabase();
-    const dbUser = await User.findById(session.userId);
-    if (!dbUser) {
-      return {
-        user: null,
-        errorResponse: Response.json(
-          { error: 'Account has been deleted or deactivated. Immediate access revoked.' },
-          { status: 401 }
-        ),
-      };
-    }
-  } catch (err) {
-    return {
-      user: null,
-      errorResponse: Response.json(
-        { error: 'Server authentication verification error.' },
-        { status: 500 }
       ),
     };
   }

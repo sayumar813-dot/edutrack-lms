@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { apiClient } from '@/services/apiClient';
 import Sidebar from '@/components/Sidebar';
+import NotificationBell from '@/components/NotificationBell';
 
 export default function StudentPage() {
   const { user, loading: authLoading } = useAuth();
@@ -85,15 +86,18 @@ export default function StudentPage() {
             </p>
           </div>
 
-          {/* Top Right Theme Toggle */}
-          <button
-            type="button"
-            onClick={toggleTheme}
-            className="theme-toggle-btn"
-            style={{ padding: '10px 20px', fontSize: '15px' }}
-          >
-            <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
-          </button>
+          {/* Top Right Actions */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className="theme-toggle-btn"
+              style={{ padding: '8px 16px', fontSize: '13px' }}
+            >
+              <span>{theme === 'dark' ? 'Light' : 'Dark'}</span>
+            </button>
+            <NotificationBell />
+          </div>
         </div>
 
         {error && (
@@ -259,6 +263,174 @@ export default function StudentPage() {
                   </table>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 2: MY TIMETABLE */}
+        {activeTab === 'timetable' && (
+          <div key="timetable" className="tab-content-animate">
+            <h2 style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '24px' }}>
+              My Class Timetable
+            </h2>
+            <div className="glass-card" style={{ padding: '28px', overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '600px' }}>
+                <thead>
+                  <tr style={{ background: 'rgba(0,243,255,0.06)' }}>
+                    {['Period', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'].map((h) => (
+                      <th key={h} style={{ padding: '12px 16px', textAlign: 'left', fontSize: '12px', fontWeight: '800', color: 'var(--text-muted)', letterSpacing: '1px' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    { period: '8:00 – 9:00', days: ['Mathematics', 'Physics', 'English', 'Mathematics', 'Biology'] },
+                    { period: '9:00 – 10:00', days: ['English', 'Mathematics', 'Physics', 'Biology', 'Chemistry'] },
+                    { period: '10:30 – 11:30', days: ['Biology', 'Chemistry', 'Mathematics', 'English', 'Physics'] },
+                    { period: '11:30 – 12:30', days: ['Chemistry', 'Biology', 'Chemistry', 'Physics', 'Mathematics'] },
+                    { period: '1:30 – 2:30', days: ['Physics', 'English', 'Biology', 'Chemistry', 'English'] },
+                  ].map((row, i) => (
+                    <tr key={i} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                      <td style={{ padding: '14px 16px', fontSize: '13px', fontWeight: '700', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{row.period}</td>
+                      {row.days.map((subj, j) => (
+                        <td key={j} style={{ padding: '14px 16px' }}>
+                          <span style={{ padding: '6px 12px', borderRadius: '10px', fontSize: '13px', fontWeight: '600', background: 'rgba(0,243,255,0.08)', color: 'var(--primary-color)', border: '1px solid rgba(0,243,255,0.15)', whiteSpace: 'nowrap' }}>
+                            {subj}
+                          </span>
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: HOMEWORK & UPLOADS */}
+        {activeTab === 'homework' && (
+          <div key="homework" className="tab-content-animate">
+            <h2 style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '24px' }}>
+              Homework &amp; Uploads
+            </h2>
+
+            {/* KPI Row */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '16px', marginBottom: '28px' }}>
+              {[
+                { label: 'Pending', value: '3', color: '#ff4d4d' },
+                { label: 'Submitted', value: '11', color: '#2bd49e' },
+                { label: 'Graded', value: '8', color: '#00f3ff' },
+                { label: 'Overdue', value: '1', color: '#ffb703' },
+              ].map((kpi, i) => (
+                <div key={i} className="glass-card" style={{ padding: '18px', textAlign: 'center' }}>
+                  <p style={{ fontSize: '28px', fontWeight: '900', color: kpi.color }}>{kpi.value}</p>
+                  <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>{kpi.label}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Assignment list */}
+            {[
+              { title: 'Algebra Problem Set', subject: 'Mathematics', due: '2026-08-10', status: 'Pending', feedback: '' },
+              { title: 'Essay: Photosynthesis', subject: 'Biology', due: '2026-08-08', status: 'Graded', feedback: 'Excellent work! A+' },
+              { title: 'Lab Report — Newton Laws', subject: 'Physics', due: '2026-08-15', status: 'Pending', feedback: '' },
+              { title: 'Grammar Exercises', subject: 'English', due: '2026-08-01', status: 'Overdue', feedback: '' },
+            ].map((a, i) => {
+              const statusColor = { Pending: '#ffb703', Graded: '#2bd49e', Submitted: '#00f3ff', Overdue: '#ff4d4d' }[a.status] || '#888';
+              return (
+                <div key={i} className="glass-card" style={{ padding: '22px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+                  <div>
+                    <p style={{ fontWeight: '700', fontSize: '15px', color: 'var(--text-main)', marginBottom: '4px' }}>{a.title}</p>
+                    <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{a.subject} · Due: {a.due}</p>
+                    {a.feedback && <p style={{ fontSize: '13px', color: '#2bd49e', marginTop: '6px' }}>{a.feedback}</p>}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span style={{ padding: '4px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: '700', background: `${statusColor}22`, color: statusColor }}>{a.status}</span>
+                    {a.status === 'Pending' && (
+                      <label style={{ cursor: 'pointer' }}>
+                        <span style={{ padding: '8px 16px', borderRadius: '10px', background: 'rgba(0,243,255,0.1)', color: 'var(--primary-color)', border: '1px solid rgba(0,243,255,0.2)', fontSize: '13px', fontWeight: '600' }}>
+                          Upload Solution
+                        </span>
+                        <input type="file" style={{ display: 'none' }} />
+                      </label>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* TAB 4: RESULTS & TRANSCRIPTS */}
+        {activeTab === 'results' && (
+          <div key="results" className="tab-content-animate">
+            <h2 style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '24px' }}>
+              Results &amp; Transcripts
+            </h2>
+
+            {/* Overall GPA */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '16px', marginBottom: '28px' }}>
+              {[
+                { label: 'Current GPA', value: '3.45', color: '#00f3ff' },
+                { label: 'Class Rank', value: '#4', color: '#2bd49e' },
+                { label: 'Top Subject', value: 'Biology', color: '#9c27b0' },
+                { label: 'Weakest Subject', value: 'Chemistry', color: '#ffb703' },
+              ].map((kpi, i) => (
+                <div key={i} className="glass-card" style={{ padding: '18px', textAlign: 'center' }}>
+                  <p style={{ fontSize: '26px', fontWeight: '900', color: kpi.color }}>{kpi.value}</p>
+                  <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>{kpi.label}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Subject-wise marks */}
+            <div className="glass-card" style={{ padding: '28px', marginBottom: '24px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '20px' }}>
+                Subject-Wise Marks Breakdown
+              </h3>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: 'rgba(0,243,255,0.06)' }}>
+                      {['Subject', 'Quiz', 'Midterm', 'Final', 'Total', 'Grade', 'GPA Points'].map((h) => (
+                        <th key={h} style={{ padding: '12px 14px', textAlign: 'left', fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[
+                      { subj: 'Mathematics', quiz: 18, mid: 35, final: 37 },
+                      { subj: 'Physics', quiz: 14, mid: 28, final: 30 },
+                      { subj: 'Biology', quiz: 19, mid: 38, final: 39 },
+                      { subj: 'Chemistry', quiz: 11, mid: 22, final: 25 },
+                      { subj: 'English', quiz: 16, mid: 33, final: 35 },
+                    ].map((s, i) => {
+                      const total = s.quiz + s.mid + s.final;
+                      const grade = total >= 90 ? 'A+' : total >= 80 ? 'A' : total >= 70 ? 'B' : total >= 60 ? 'C' : 'F';
+                      const gpa = total >= 90 ? '4.0' : total >= 80 ? '3.7' : total >= 70 ? '3.0' : total >= 60 ? '2.0' : '0.0';
+                      const color = total >= 70 ? '#2bd49e' : total >= 60 ? '#ffb703' : '#ff4d4d';
+                      return (
+                        <tr key={i} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                          <td style={{ padding: '12px 14px', fontWeight: '600', color: 'var(--text-main)' }}>{s.subj}</td>
+                          <td style={{ padding: '12px 14px', color: 'var(--text-muted)' }}>{s.quiz}/20</td>
+                          <td style={{ padding: '12px 14px', color: 'var(--text-muted)' }}>{s.mid}/40</td>
+                          <td style={{ padding: '12px 14px', color: 'var(--text-muted)' }}>{s.final}/40</td>
+                          <td style={{ padding: '12px 14px', fontWeight: '700', color: 'var(--text-main)' }}>{total}/100</td>
+                          <td style={{ padding: '12px 14px' }}>
+                            <span style={{ padding: '4px 10px', borderRadius: '8px', fontSize: '13px', fontWeight: '800', background: `${color}22`, color }}>{grade}</span>
+                          </td>
+                          <td style={{ padding: '12px 14px', fontWeight: '700', color }}>{gpa}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{ marginTop: '20px' }}>
+                <button className="btn-primary" style={{ padding: '10px 24px' }}>
+                  Download Official Report Card (PDF)
+                </button>
+              </div>
             </div>
           </div>
         )}
