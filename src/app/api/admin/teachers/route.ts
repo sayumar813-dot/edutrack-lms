@@ -10,21 +10,59 @@ export async function GET(req: NextRequest) {
   try {
     const supabase = createAdminClient();
 
+    // Fetch teachers from user_profiles (role TEACHER)
     const { data: profiles, error } = await supabase
       .from('user_profiles')
-      .select('*')
+      .select('id, email, first_name, last_name, phone_number, roles, created_at')
       .contains('roles', ['TEACHER'])
+      .is('deleted_at', null)
       .order('created_at', { ascending: false });
 
     if (error) {
+      console.error('Teachers fetch error:', error.message);
       return NextResponse.json({ success: true, teachers: [] });
     }
 
-    const formattedTeachers = (profiles || []).map((t: any) => ({
+    // Also check auth.users for any teacher who may have a profile not yet showing
+    // (this ensures teachers created via auth.admin.createUser always appear)
+    const { data: authUsers } = await supabase.auth.admin.listUsers();
+    const authTeachers = (authUsers?.users || []).filter((u: any) =>
+      u.user_metadata?.role === 'teacher' || u.app_metadata?.role === 'teacher'
+    );
+
+    // Build a set of IDs already in profiles
+    const existingIds = new Set((profiles || []).map((p: any) => p.id));
+
+    // Upsert any auth teachers missing from user_profiles
+    const missingTeachers: any[] = [];
+    for (const authUser of authTeachers) {
+      if (!existingIds.has(authUser.id)) {
+        const firstName = authUser.user_metadata?.first_name || authUser.email?.split('@')[0] || 'Teacher';
+        const lastName = authUser.user_metadata?.last_name || '';
+        // Auto-create their profile row
+        const { data: newProfile } = await supabase
+          .from('user_profiles')
+          .upsert({
+            id: authUser.id,
+            email: authUser.email,
+            first_name: firstName,
+            last_name: lastName,
+            roles: ['TEACHER'],
+          })
+          .select('id, email, first_name, last_name, phone_number, roles, created_at')
+          .single();
+
+        if (newProfile) missingTeachers.push(newProfile);
+      }
+    }
+
+    const allTeacherProfiles = [...(profiles || []), ...missingTeachers];
+
+    const formattedTeachers = allTeacherProfiles.map((t: any) => ({
       _id: t.id,
       userId: {
         _id: t.id,
-        name: `${t.first_name || ''} ${t.last_name || ''}`.trim() || 'Teacher',
+        name: `${t.first_name || ''} ${t.last_name || ''}`.trim() || t.email?.split('@')[0] || 'Teacher',
         email: t.email,
         createdAt: t.created_at,
       },
@@ -47,56 +85,86 @@ export async function POST(req: NextRequest) {
     const { name, email, password, phone } = await req.json();
 
     if (!name || !email) {
-      return NextResponse.json(
-        { error: 'Name and email are required.' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'Name and email are required.' }, { status: 400 });
     }
 
     const supabase = createAdminClient();
+    const cleanEmail = email.toLowerCase().trim();
 
-    const { data: existingProfile } = await supabase
-      .from('user_profiles')
-      .select('id')
-      .eq('email', email.toLowerCase().trim())
-      .maybeSingle();
+    // Check if already exists in auth.users
+    const { data: authUsers } = await supabase.auth.admin.listUsers();
+    const existingAuthUser = (authUsers?.users || []).find((u: any) => u.email === cleanEmail);
 
-    if (existingProfile) {
-      return NextResponse.json({ error: 'An account with this email already exists.' }, { status: 400 });
+    if (existingAuthUser) {
+      // Already in auth — just ensure they have a TEACHER profile row
+      const nameParts = name.trim().split(' ');
+      const firstName = nameParts[0] || 'Teacher';
+      const lastName = nameParts.slice(1).join(' ') || '';
+
+      const { data: existing } = await supabase
+        .from('user_profiles')
+        .upsert({
+          id: existingAuthUser.id,
+          email: cleanEmail,
+          first_name: firstName,
+          last_name: lastName,
+          roles: ['TEACHER'],
+          phone_number: phone || null,
+        })
+        .select()
+        .single();
+
+      return NextResponse.json({
+        success: true,
+        message: 'Teacher profile updated with TEACHER role.',
+        teacher: existing,
+        tempPassword: null,
+      });
     }
 
-    const tempPassword = password && password.trim() ? password.trim() : `Teach_${crypto.randomBytes(4).toString('hex')}!`;
+    const tempPassword = password?.trim() ? password.trim() : `Teach_${crypto.randomBytes(4).toString('hex')}!`;
     const nameParts = name.trim().split(' ');
     const firstName = nameParts[0] || 'Teacher';
     const lastName = nameParts.slice(1).join(' ') || '';
 
     const { data: authUser, error: authErr } = await supabase.auth.admin.createUser({
-      email: email.toLowerCase().trim(),
+      email: cleanEmail,
       password: tempPassword,
       email_confirm: true,
       user_metadata: { first_name: firstName, last_name: lastName, role: 'teacher' },
     });
 
     if (authErr || !authUser?.user) {
-      return NextResponse.json({ error: authErr?.message || 'Failed to create teacher authentication record.' }, { status: 400 });
+      return NextResponse.json({ error: authErr?.message || 'Failed to create auth account.' }, { status: 400 });
     }
 
-    const { data: newTeacherProfile, error: profileErr } = await supabase.from('user_profiles').upsert({
-      id: authUser.user.id,
-      email: email.toLowerCase().trim(),
-      first_name: firstName,
-      last_name: lastName,
-      roles: ['TEACHER'],
-    }).select().single();
+    const { data: newProfile, error: profileErr } = await supabase
+      .from('user_profiles')
+      .upsert({
+        id: authUser.user.id,
+        email: cleanEmail,
+        first_name: firstName,
+        last_name: lastName,
+        roles: ['TEACHER'],
+        phone_number: phone || null,
+      })
+      .select()
+      .single();
 
     if (profileErr) {
-      return NextResponse.json({ error: profileErr.message }, { status: 400 });
+      // Profile upsert failed but auth user was created — return partial success
+      return NextResponse.json({
+        success: true,
+        message: 'Teacher auth created. Profile sync may need DB migration.',
+        teacher: { id: authUser.user.id, email: cleanEmail, first_name: firstName, last_name: lastName },
+        tempPassword,
+      });
     }
 
     return NextResponse.json({
       success: true,
       message: 'Teacher created successfully.',
-      teacher: newTeacherProfile,
+      teacher: newProfile,
       tempPassword,
     });
   } catch (error: any) {
@@ -119,7 +187,8 @@ export async function DELETE(req: NextRequest) {
 
     const supabase = createAdminClient();
 
-    await supabase.auth.admin.deleteUser(teacherId);
+    // Delete auth user (soft-errors OK)
+    try { await supabase.auth.admin.deleteUser(teacherId); } catch (_) {}
     await supabase.from('user_profiles').delete().eq('id', teacherId);
 
     return NextResponse.json({
