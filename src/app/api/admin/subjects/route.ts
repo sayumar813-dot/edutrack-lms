@@ -12,32 +12,28 @@ export async function GET(req: NextRequest) {
     const { data: subjects, error } = await supabase
       .from('subjects')
       .select(`
-        *,
-        user_profiles:teacher_id (
-          id,
-          first_name,
-          last_name,
-          email
-        ),
-        classes:class_id (
-          id,
-          name,
-          section
-        )
+        id, name, code, teacher_id, class_id, created_at,
+        user_profiles:teacher_id ( id, first_name, last_name, email ),
+        classes:class_id ( id, name, section )
       `)
       .order('created_at', { ascending: false });
 
     if (error) {
-      const { data: fallbackSubjects } = await supabase.from('subjects').select('*').order('created_at', { ascending: false });
-      const formattedFallback = (fallbackSubjects || []).map((s: any) => ({
+      // Fall back if teacher_id / class_id columns don't exist yet
+      const { data: simple } = await supabase
+        .from('subjects')
+        .select('id, name, code, created_at')
+        .order('created_at', { ascending: false });
+
+      const fallback = (simple || []).map((s: any) => ({
         _id: s.id,
         name: s.name,
         code: s.code,
-        classId: s.class_id || null,
-        teacherId: s.teacher_id || null,
+        classId: null,
+        teacherId: null,
         createdAt: s.created_at,
       }));
-      return NextResponse.json({ success: true, subjects: formattedFallback });
+      return NextResponse.json({ success: true, subjects: fallback });
     }
 
     const formattedSubjects = (subjects || []).map((s: any) => {
@@ -61,8 +57,8 @@ export async function GET(req: NextRequest) {
         _id: s.id,
         name: s.name,
         code: s.code,
-        classId: classObj || s.class_id || null,
-        teacherId: teacherObj || s.teacher_id || null,
+        classId: classObj || null,
+        teacherId: teacherObj || null,
         teacher: teacherObj,
         createdAt: s.created_at,
       };
@@ -99,10 +95,20 @@ export async function POST(req: NextRequest) {
     const { data: newSubject, error } = await supabase
       .from('subjects')
       .insert(insertPayload)
-      .select()
+      .select('id, name, code, created_at')
       .single();
 
     if (error) {
+      // Retry without optional columns if they're missing
+      if (error.message?.includes('teacher_id') || error.message?.includes('class_id')) {
+        const { data: fallback, error: fe } = await supabase
+          .from('subjects')
+          .insert({ name: insertPayload.name, code: insertPayload.code })
+          .select('id, name, code, created_at')
+          .single();
+        if (fe) return NextResponse.json({ error: fe.message }, { status: 400 });
+        return NextResponse.json({ success: true, message: 'Subject created (run SQL migration to enable teacher/class assignment).', subject: fallback });
+      }
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
@@ -160,10 +166,24 @@ export async function PUT(req: NextRequest) {
       .from('subjects')
       .update(updatePayload)
       .eq('id', id)
-      .select()
+      .select('id, name, code, teacher_id, class_id, created_at')
       .single();
 
     if (error) {
+      // Retry without optional columns if missing
+      if (error.message?.includes('teacher_id') || error.message?.includes('class_id')) {
+        const safePayload: any = {};
+        if (name) safePayload.name = name.trim();
+        if (code) safePayload.code = code.trim().toUpperCase();
+        const { data: fallback, error: fe } = await supabase
+          .from('subjects')
+          .update(safePayload)
+          .eq('id', id)
+          .select('id, name, code, created_at')
+          .single();
+        if (fe) return NextResponse.json({ error: fe.message }, { status: 400 });
+        return NextResponse.json({ success: true, message: 'Updated (run SQL migration to enable teacher assignment).', subject: fallback });
+      }
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 

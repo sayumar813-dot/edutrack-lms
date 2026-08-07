@@ -9,33 +9,28 @@ export async function GET(req: NextRequest) {
   try {
     const supabase = createAdminClient();
 
-    const { data: classesList, error } = await supabase
+    // First try with teacher_id join; fall back gracefully if column missing
+    let classesList: any[] = [];
+    const { data: withJoin, error: joinError } = await supabase
       .from('classes')
       .select(`
-        *,
-        user_profiles:teacher_id (
-          id,
-          first_name,
-          last_name,
-          email
-        )
+        id, name, section, room_number, teacher_id, created_at,
+        user_profiles:teacher_id ( id, first_name, last_name, email )
       `)
       .order('created_at', { ascending: false });
 
-    if (error) {
-      const { data: fallbackList } = await supabase.from('classes').select('*').order('created_at', { ascending: false });
-      const formattedFallback = (fallbackList || []).map((c: any) => ({
-        _id: c.id,
-        name: c.name,
-        section: c.section,
-        roomNumber: c.room_number,
-        teacherId: c.teacher_id || null,
-        createdAt: c.created_at,
-      }));
-      return NextResponse.json({ success: true, classes: formattedFallback });
+    if (joinError) {
+      // Column or relation doesn't exist yet — fetch simple columns
+      const { data: simple } = await supabase
+        .from('classes')
+        .select('id, name, section, room_number, created_at')
+        .order('created_at', { ascending: false });
+      classesList = simple || [];
+    } else {
+      classesList = withJoin || [];
     }
 
-    const formattedClasses = (classesList || []).map((c: any) => {
+    const formattedClasses = classesList.map((c: any) => {
       const teacherObj = c.user_profiles ? {
         _id: c.user_profiles.id,
         name: `${c.user_profiles.first_name || ''} ${c.user_profiles.last_name || ''}`.trim() || 'Teacher',
@@ -49,9 +44,9 @@ export async function GET(req: NextRequest) {
       return {
         _id: c.id,
         name: c.name,
-        section: c.section,
-        roomNumber: c.room_number,
-        teacherId: teacherObj || c.teacher_id || null,
+        section: c.section || null,
+        roomNumber: c.room_number || null,
+        teacherId: teacherObj || null,
         teacher: teacherObj,
         createdAt: c.created_at,
       };
@@ -82,21 +77,33 @@ export async function POST(req: NextRequest) {
       section: section ? section.trim() : null,
       room_number: roomNumber ? roomNumber.trim() : null,
     };
+
+    // Only add teacher_id if provided — column may not exist yet
     if (teacherId) insertPayload.teacher_id = teacherId;
 
     const { data: newClass, error } = await supabase
       .from('classes')
       .insert(insertPayload)
-      .select()
+      .select('id, name, section, room_number, created_at')
       .single();
 
     if (error) {
+      // If teacher_id column missing, retry without it
+      if (error.message?.includes('teacher_id')) {
+        const { data: fallbackClass, error: fallbackErr } = await supabase
+          .from('classes')
+          .insert({ name: insertPayload.name, section: insertPayload.section, room_number: insertPayload.room_number })
+          .select('id, name, section, room_number, created_at')
+          .single();
+        if (fallbackErr) return NextResponse.json({ error: fallbackErr.message }, { status: 400 });
+        return NextResponse.json({ success: true, message: 'Class created (teacher_id column missing — run SQL migration).', class: fallbackClass });
+      }
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Class created & teacher assigned successfully.',
+      message: 'Class created successfully.',
       class: newClass,
     });
   } catch (error) {
@@ -129,16 +136,27 @@ export async function PUT(req: NextRequest) {
       .from('classes')
       .update(updatePayload)
       .eq('id', id)
-      .select()
+      .select('id, name, section, room_number, created_at')
       .single();
 
     if (error) {
+      // teacher_id column missing — update without it
+      if (error.message?.includes('teacher_id')) {
+        const { data: fallback, error: fe } = await supabase
+          .from('classes')
+          .update({ name: updatePayload.name, section: updatePayload.section, room_number: updatePayload.room_number })
+          .eq('id', id)
+          .select('id, name, section, room_number, created_at')
+          .single();
+        if (fe) return NextResponse.json({ error: fe.message }, { status: 400 });
+        return NextResponse.json({ success: true, message: 'Class updated (run SQL migration to enable teacher assignment).', class: fallback });
+      }
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
     return NextResponse.json({
       success: true,
-      message: 'Class updated & teacher assigned successfully.',
+      message: 'Class updated successfully.',
       class: updatedClass,
     });
   } catch (error) {
@@ -166,10 +184,7 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
 
-    return NextResponse.json({
-      success: true,
-      message: 'Class deleted successfully.',
-    });
+    return NextResponse.json({ success: true, message: 'Class deleted successfully.' });
   } catch (error) {
     console.error('Delete class error:', error);
     return NextResponse.json({ error: 'Server error deleting class.' }, { status: 500 });
