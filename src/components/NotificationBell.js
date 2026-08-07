@@ -40,7 +40,7 @@ export default function NotificationBell() {
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [user]);
+  }, [user?.id]);
 
   const unreadCount = notifications.filter((n) => n.unread).length;
 
