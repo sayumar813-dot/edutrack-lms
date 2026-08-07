@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/auth-middleware';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/server';
 
 export async function GET(req: NextRequest) {
   const { errorResponse } = await authenticateRequest(req, ['admin', 'teacher', 'student']);
   if (errorResponse) return errorResponse;
 
   try {
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
     const { data: subjects, error } = await supabase
       .from('subjects')
@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Subject name is required.' }, { status: 400 });
     }
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const subjectCode = code ? code.trim().toUpperCase() : name.trim().slice(0, 4).toUpperCase() + '101';
 
     const { data: newSubject, error } = await supabase
@@ -82,7 +82,7 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Subject ID is required.' }, { status: 400 });
     }
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const { error } = await supabase.from('subjects').delete().eq('id', subjectId);
 
     if (error) {

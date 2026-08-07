@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/auth-middleware';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/server';
 import crypto from 'crypto';
 
 export async function GET(req: NextRequest) {
@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
   if (errorResponse) return errorResponse;
 
   try {
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
     const { data: students, error } = await supabase
       .from('student_profiles')
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
     const { data: existingProfile } = await supabase
       .from('user_profiles')
@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
       user_metadata: { first_name: firstName, last_name: lastName, role: 'student' },
     });
 
-    if (authErr || !authUser.user) {
+    if (authErr || !authUser?.user) {
       return NextResponse.json({ error: authErr?.message || 'Failed to create student authentication record.' }, { status: 400 });
     }
 
@@ -99,6 +99,7 @@ export async function POST(req: NextRequest) {
       first_name: firstName,
       last_name: lastName,
       roles: ['STUDENT'],
+      role: 'student',
     });
 
     const { data: sessionData } = await supabase
@@ -145,7 +146,7 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Student ID parameter is required.' }, { status: 400 });
     }
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
     const { data: student } = await supabase
       .from('student_profiles')

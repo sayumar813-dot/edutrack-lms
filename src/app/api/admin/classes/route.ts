@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/auth-middleware';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/server';
 
 export async function GET(req: NextRequest) {
   const { errorResponse } = await authenticateRequest(req, ['admin', 'teacher', 'student']);
   if (errorResponse) return errorResponse;
 
   try {
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
     const { data: classesList, error } = await supabase
       .from('classes')
@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Class name is required.' }, { status: 400 });
     }
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
     const { data: newClass, error } = await supabase
       .from('classes')
@@ -82,7 +82,7 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'Class ID and Name are required.' }, { status: 400 });
     }
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
     const { data: updatedClass, error } = await supabase
       .from('classes')
@@ -122,7 +122,7 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Class ID parameter is required.' }, { status: 400 });
     }
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
     const { error } = await supabase.from('classes').delete().eq('id', classId);
 
     if (error) {

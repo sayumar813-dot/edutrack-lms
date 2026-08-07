@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateRequest } from '@/lib/auth-middleware';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/server';
 import crypto from 'crypto';
 
 export async function GET(req: NextRequest) {
@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
   if (errorResponse) return errorResponse;
 
   try {
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
     const { data: profiles, error } = await supabase
       .from('user_profiles')
@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
         email: t.email,
         createdAt: t.created_at,
       },
-      phone: '',
+      phone: t.phone_number || '',
       subjectsAssigned: [],
     }));
 
@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
   if (errorResponse) return errorResponse;
 
   try {
-    const { name, email, password } = await req.json();
+    const { name, email, password, phone } = await req.json();
 
     if (!name || !email) {
       return NextResponse.json(
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
     const { data: existingProfile } = await supabase
       .from('user_profiles')
@@ -77,17 +77,22 @@ export async function POST(req: NextRequest) {
       user_metadata: { first_name: firstName, last_name: lastName, role: 'teacher' },
     });
 
-    if (authErr || !authUser.user) {
+    if (authErr || !authUser?.user) {
       return NextResponse.json({ error: authErr?.message || 'Failed to create teacher authentication record.' }, { status: 400 });
     }
 
-    const { data: newTeacherProfile } = await supabase.from('user_profiles').upsert({
+    const { data: newTeacherProfile, error: profileErr } = await supabase.from('user_profiles').upsert({
       id: authUser.user.id,
       email: email.toLowerCase().trim(),
       first_name: firstName,
       last_name: lastName,
       roles: ['TEACHER'],
+      role: 'teacher',
     }).select().single();
+
+    if (profileErr) {
+      return NextResponse.json({ error: profileErr.message }, { status: 400 });
+    }
 
     return NextResponse.json({
       success: true,
@@ -95,9 +100,9 @@ export async function POST(req: NextRequest) {
       teacher: newTeacherProfile,
       tempPassword,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Create teacher error:', error);
-    return NextResponse.json({ error: 'Server error creating teacher.' }, { status: 500 });
+    return NextResponse.json({ error: error.message || 'Server error creating teacher.' }, { status: 500 });
   }
 }
 
@@ -113,7 +118,7 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json({ error: 'Teacher ID parameter is required.' }, { status: 400 });
     }
 
-    const supabase = await createClient();
+    const supabase = createAdminClient();
 
     await supabase.auth.admin.deleteUser(teacherId);
     await supabase.from('user_profiles').delete().eq('id', teacherId);
