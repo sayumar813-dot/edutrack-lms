@@ -99,7 +99,6 @@ export async function POST(req: NextRequest) {
       first_name: firstName,
       last_name: lastName,
       roles: ['STUDENT'],
-      role: 'student',
     });
 
     const { data: sessionData } = await supabase

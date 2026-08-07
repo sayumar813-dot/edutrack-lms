@@ -87,7 +87,6 @@ export async function POST(req: NextRequest) {
       first_name: firstName,
       last_name: lastName,
       roles: ['TEACHER'],
-      role: 'teacher',
     }).select().single();
 
     if (profileErr) {
