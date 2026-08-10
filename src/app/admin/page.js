@@ -43,6 +43,9 @@ export default function AdminPage() {
   const [invoiceSuccess, setInvoiceSuccess] = useState('');
   const [invoiceError, setInvoiceError] = useState('');
   const [feeLedger, setFeeLedger] = useState([]);
+  const [feeStats, setFeeStats] = useState({ totalCollected: 0, totalOutstanding: 0, pendingCount: 0, paidCount: 0, totalInvoices: 0 });
+  const [payingFee, setPayingFee] = useState(null); // feeId being paid
+  const [payAmount, setPayAmount] = useState('');
 
   // Audit Logs State & Filters
   const [auditLogs, setAuditLogs] = useState([]);
@@ -97,18 +100,12 @@ export default function AdminPage() {
       } catch (aErr) {}
 
       try {
-        const feeRes = await apiClient('/api/v1/fees');
-        if (feeRes.success && feeRes.invoices) {
-          setFeeLedger(feeRes.invoices.map((f) => ({
-            student: f.studentId?.userId?.name || f.studentId?.rollNo || 'Student',
-            invoice: f.title || 'Tuition Fee',
-            amount: `₨ ${f.amount?.toLocaleString() || 0}`,
-            due: f.dueDate ? f.dueDate.split('T')[0] : '—',
-            paid: f.paidAt ? f.paidAt.split('T')[0] : '—',
-            status: f.status || 'Pending',
-          })));
+        const feeRes = await apiClient('/api/admin/fees');
+        if (feeRes.success && feeRes.fees) {
+          setFeeLedger(feeRes.fees);
+          if (feeRes.stats) setFeeStats(feeRes.stats);
         }
-      } catch (fErr) {}
+      } catch (fErr) { console.warn('Fees load error:', fErr.message); }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -141,61 +138,72 @@ export default function AdminPage() {
     setInvoiceError('');
     setInvoiceSuccess('');
 
-    if (!newInvoice.studentId) {
-      setInvoiceError('Please select a student.');
-      return;
-    }
-    if (!newInvoice.title.trim()) {
-      setInvoiceError('Please enter an invoice title.');
-      return;
-    }
-    if (!newInvoice.amount || Number(newInvoice.amount) <= 0) {
-      setInvoiceError('Please enter a valid amount.');
-      return;
-    }
-    if (!newInvoice.dueDate) {
-      setInvoiceError('Please select a due date.');
-      return;
-    }
+    if (!newInvoice.studentId) return setInvoiceError('Please select a student.');
+    if (!newInvoice.title.trim()) return setInvoiceError('Please enter an invoice title.');
+    if (!newInvoice.amount || Number(newInvoice.amount) <= 0) return setInvoiceError('Please enter a valid amount.');
+    if (!newInvoice.dueDate) return setInvoiceError('Please select a due date.');
 
     try {
       setSubmittingInvoice(true);
       const stObj = students.find((s) => (s._id || s.id) === newInvoice.studentId);
-      const studentName = stObj?.userId?.name || stObj?.name || 'Selected Student';
+      const studentName = stObj?.userId?.name || stObj?.name || 'Student';
 
-      try {
-        await apiClient('/api/v1/fees', {
-          method: 'POST',
-          body: JSON.stringify({
-            studentId: newInvoice.studentId,
-            title: newInvoice.title.trim(),
-            amount: Number(newInvoice.amount),
-            dueDate: newInvoice.dueDate,
-            academicSessionId: '00000000-0000-0000-0000-000000000001',
-          }),
-        });
-      } catch (apiErr) {
-        console.warn('API Fee note:', apiErr.message);
-      }
+      await apiClient('/api/admin/fees', {
+        method: 'POST',
+        body: JSON.stringify({
+          studentId: newInvoice.studentId,   // this is student_profiles.id
+          title: newInvoice.title.trim(),
+          amount: Number(newInvoice.amount),
+          dueDate: newInvoice.dueDate,
+        }),
+      });
 
-      setFeeLedger((prev) => [
-        {
-          student: studentName,
-          invoice: newInvoice.title.trim(),
-          amount: `₨ ${Number(newInvoice.amount).toLocaleString()}`,
-          due: newInvoice.dueDate,
-          paid: '—',
-          status: 'Pending',
-        },
-        ...prev,
-      ]);
-
-      setInvoiceSuccess(`Invoice "${newInvoice.title.trim()}" generated and issued to ${studentName}!`);
+      setInvoiceSuccess(`✅ Invoice "${newInvoice.title.trim()}" issued to ${studentName}!`);
       setNewInvoice({ studentId: '', title: '', amount: '', dueDate: '' });
+      // Reload ledger with live data
+      const feeRes = await apiClient('/api/admin/fees');
+      if (feeRes.success && feeRes.fees) {
+        setFeeLedger(feeRes.fees);
+        if (feeRes.stats) setFeeStats(feeRes.stats);
+      }
     } catch (err) {
       setInvoiceError(err.message || 'Failed to generate fee invoice.');
     } finally {
       setSubmittingInvoice(false);
+    }
+  };
+
+  const handleMarkFeePaid = async (feeId, outstandingAmount) => {
+    const amt = payAmount || outstandingAmount;
+    if (!amt || Number(amt) <= 0) return;
+    try {
+      await apiClient('/api/admin/fees', {
+        method: 'PUT',
+        body: JSON.stringify({ id: feeId, paymentAmount: Number(amt) }),
+      });
+      setPayingFee(null);
+      setPayAmount('');
+      const feeRes = await apiClient('/api/admin/fees');
+      if (feeRes.success && feeRes.fees) {
+        setFeeLedger(feeRes.fees);
+        if (feeRes.stats) setFeeStats(feeRes.stats);
+      }
+    } catch (err) {
+      setInvoiceError(err.message || 'Failed to record payment.');
+    }
+  };
+
+  const handleDeleteFee = async (feeId) => {
+    if (!window.confirm('Delete this fee record?')) return;
+    try {
+      await apiClient(`/api/admin/fees?id=${feeId}`, { method: 'DELETE' });
+      const feeRes = await apiClient('/api/admin/fees');
+      if (feeRes.success && feeRes.fees) {
+        setFeeLedger(feeRes.fees);
+        if (feeRes.stats) setFeeStats(feeRes.stats);
+      }
+    } catch (err) {
+      setInvoiceError(err.message || 'Failed to delete fee record.');
     }
   };
 
@@ -404,7 +412,14 @@ export default function AdminPage() {
   const filteredStudents = q ? students.filter(s => (s.userId?.name || s.name || '').toLowerCase().includes(q) || (s.rollNo || '').toLowerCase().includes(q)) : students;
   const filteredClasses = q ? classes.filter(c => (c.name || '').toLowerCase().includes(q)) : classes;
   const filteredSubjects = q ? subjects.filter(s => (s.name || '').toLowerCase().includes(q)) : subjects;
-  const filteredFeeLedger = q ? feeLedger.filter(f => f.student.toLowerCase().includes(q) || f.invoice.toLowerCase().includes(q)) : feeLedger;
+  const filteredFeeLedger = q
+    ? feeLedger.filter(f =>
+        (f.student || '').toLowerCase().includes(q) ||
+        (f.invoice || '').toLowerCase().includes(q) ||
+        (f.rollNo || '').toLowerCase().includes(q) ||
+        (f.studentEmail || '').toLowerCase().includes(q)
+      )
+    : feeLedger;
   
   const filteredAuditLogs = auditLogs.filter(log => {
     const matchesQuery = !q || log.user.toLowerCase().includes(q) || log.action.toLowerCase().includes(q) || log.resource.toLowerCase().includes(q) || log.ip.includes(q);
@@ -1230,13 +1245,13 @@ export default function AdminPage() {
               Fee Management &amp; Invoicing
             </h2>
 
-            {/* KPI Row */}
+            {/* KPI Row — Live from Supabase */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '20px', marginBottom: '28px' }}>
               {[
-                { label: 'Total Collected', value: '₨ 1.24M', sub: 'This term', color: '#2bd49e' },
-                { label: 'Outstanding', value: '₨ 380K', sub: '42 invoices pending', color: '#ff4d4d' },
-                { label: 'Discounts Granted', value: '₨ 56K', sub: '12 waivers approved', color: '#ffb703' },
-                { label: 'Receipts Issued', value: '186', sub: 'This month', color: '#00f3ff' },
+                { label: 'Total Collected', value: `₨ ${(feeStats.totalCollected || 0).toLocaleString()}`, sub: 'Total payments received', color: '#2bd49e' },
+                { label: 'Outstanding', value: `₨ ${(feeStats.totalOutstanding || 0).toLocaleString()}`, sub: `${feeStats.pendingCount || 0} invoices pending`, color: '#ff4d4d' },
+                { label: 'Invoices Paid', value: String(feeStats.paidCount || 0), sub: 'Fully cleared', color: '#ffb703' },
+                { label: 'Total Invoices', value: String(feeStats.totalInvoices || 0), sub: 'All time', color: '#00f3ff' },
               ].map((kpi, i) => (
                 <div key={i} className="glass-card" style={{ padding: '20px', textAlign: 'center' }}>
                   <p style={{ fontSize: '24px', fontWeight: '900', color: kpi.color }}>{kpi.value}</p>
@@ -1274,10 +1289,11 @@ export default function AdminPage() {
                       onChange={(e) => setNewInvoice({ ...newInvoice, studentId: e.target.value })}
                       required
                     >
-                      <option value="">Select Student</option>
+                      <option value="">— Select Student —</option>
+                      {students.length === 0 && <option disabled>No students registered yet</option>}
                       {students.map((s) => (
-                        <option key={s._id || s.id} value={s._id || s.id}>
-                          {s.userId?.name || s.name} {s.rollNo ? `(Roll: ${s.rollNo})` : ''}
+                        <option key={s._id} value={s._id}>
+                          {s.userId?.name || s.name || 'Student'}{s.rollNo ? ` (Roll: ${s.rollNo})` : ''}
                         </option>
                       ))}
                     </select>
@@ -1327,37 +1343,69 @@ export default function AdminPage() {
 
             {/* Fee Ledger */}
             <div className="glass-card" style={{ padding: '28px' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '20px' }}>
-                Payment Ledger
-              </h3>
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr style={{ background: 'rgba(0,243,255,0.06)' }}>
-                      {['Student', 'Invoice', 'Amount', 'Due Date', 'Paid On', 'Status'].map((h) => (
-                        <th key={h} style={{ padding: '12px 14px', textAlign: 'left', fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredFeeLedger.map((row, i) => {
-                      const sc = { Paid: '#2bd49e', Pending: '#ffb703', Overdue: '#ff4d4d' }[row.status] || '#ffb703';
-                      return (
-                        <tr key={i} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                          <td style={{ padding: '12px 14px', fontWeight: '600', color: 'var(--text-main)' }}>{row.student}</td>
-                          <td style={{ padding: '12px 14px', color: 'var(--text-muted)', fontSize: '13px' }}>{row.invoice}</td>
-                          <td style={{ padding: '12px 14px', fontWeight: '700', color: 'var(--text-main)' }}>{row.amount}</td>
-                          <td style={{ padding: '12px 14px', color: 'var(--text-muted)', fontSize: '13px' }}>{row.due}</td>
-                          <td style={{ padding: '12px 14px', color: 'var(--text-muted)', fontSize: '13px' }}>{row.paid}</td>
-                          <td style={{ padding: '12px 14px' }}>
-                            <span style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '700', background: `${sc}22`, color: sc }}>{row.status}</span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <h3 style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-main)', margin: 0 }}>Payment Ledger</h3>
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{filteredFeeLedger.length} record{filteredFeeLedger.length !== 1 ? 's' : ''}</span>
               </div>
+
+              {filteredFeeLedger.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)', fontSize: '14px' }}>
+                  <div style={{ fontSize: '36px', marginBottom: '12px' }}>🧾</div>
+                  No fee invoices found. Generate one above.
+                </div>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: 'rgba(0,243,255,0.06)' }}>
+                        {['Student', 'Roll No', 'Invoice', 'Amount', 'Paid', 'Due Date', 'Status', 'Actions'].map((h) => (
+                          <th key={h} style={{ padding: '12px 14px', textAlign: 'left', fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredFeeLedger.map((row) => {
+                        const sc = { PAID: '#2bd49e', PARTIAL: '#ffb703', UNPAID: '#ff4d4d', OVERDUE: '#ff4d4d' }[row.status] || '#ffb703';
+                        const displayStatus = { PAID: 'Paid', PARTIAL: 'Partial', UNPAID: 'Pending', OVERDUE: 'Overdue' }[row.status] || row.status;
+                        const outstanding = Number(row.amount || 0) - Number(row.paidAmount || 0);
+                        return (
+                          <tr key={row._id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                            <td style={{ padding: '12px 14px', fontWeight: '600', color: 'var(--text-main)', whiteSpace: 'nowrap' }}>{row.student}</td>
+                            <td style={{ padding: '12px 14px', fontSize: '12px', color: 'var(--text-muted)' }}>{row.rollNo || '—'}</td>
+                            <td style={{ padding: '12px 14px', color: 'var(--text-muted)', fontSize: '13px' }}>{row.invoice}</td>
+                            <td style={{ padding: '12px 14px', fontWeight: '700', color: 'var(--text-main)' }}>₨ {Number(row.amount || 0).toLocaleString()}</td>
+                            <td style={{ padding: '12px 14px', fontSize: '13px', color: row.paidAmount > 0 ? '#2bd49e' : 'var(--text-muted)' }}>₨ {Number(row.paidAmount || 0).toLocaleString()}</td>
+                            <td style={{ padding: '12px 14px', color: 'var(--text-muted)', fontSize: '13px' }}>{row.due ? row.due.split('T')[0] : '—'}</td>
+                            <td style={{ padding: '12px 14px' }}>
+                              <span style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '700', background: `${sc}22`, color: sc, whiteSpace: 'nowrap' }}>{displayStatus}</span>
+                            </td>
+                            <td style={{ padding: '12px 14px' }}>
+                              {row.status !== 'PAID' && (
+                                payingFee === row._id ? (
+                                  <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                    <input
+                                      type="number"
+                                      placeholder={`Max ₨${outstanding.toLocaleString()}`}
+                                      value={payAmount}
+                                      onChange={(e) => setPayAmount(e.target.value)}
+                                      style={{ width: '120px', padding: '4px 8px', borderRadius: '6px', border: '1px solid var(--border-color)', background: 'var(--card-bg)', color: 'var(--text-main)', fontSize: '12px' }}
+                                    />
+                                    <button onClick={() => handleMarkFeePaid(row._id, outstanding)} style={{ background: '#2bd49e', color: '#000', border: 'none', padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}>✓</button>
+                                    <button onClick={() => { setPayingFee(null); setPayAmount(''); }} style={{ background: 'transparent', color: 'var(--text-muted)', border: '1px solid var(--border-color)', padding: '4px 8px', borderRadius: '6px', fontSize: '11px', cursor: 'pointer' }}>✕</button>
+                                  </div>
+                                ) : (
+                                  <button onClick={() => { setPayingFee(row._id); setPayAmount(''); }} style={{ background: 'rgba(0,243,255,0.1)', color: '#00f3ff', border: '1px solid rgba(0,243,255,0.3)', padding: '4px 12px', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer', whiteSpace: 'nowrap' }}>Record Payment</button>
+                                )
+                              )}
+                              <button onClick={() => handleDeleteFee(row._id)} style={{ background: 'rgba(255,77,77,0.1)', color: '#ff4d4d', border: '1px solid rgba(255,77,77,0.2)', padding: '4px 8px', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', marginLeft: '4px' }}>🗑</button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           </div>
         )}
