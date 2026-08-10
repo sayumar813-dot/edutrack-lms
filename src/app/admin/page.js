@@ -66,6 +66,19 @@ export default function AdminPage() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
+  // Smart Alert Engine State & Rules Matrix
+  const [alertsList, setAlertsList] = useState([]);
+  const [alertStats, setAlertStats] = useState({ total: 0, active: 0, escalated: 0, acknowledged: 0, resolved: 0 });
+  const [alertFilterSeverity, setAlertFilterSeverity] = useState('');
+  const [alertFilterStatus, setAlertFilterStatus] = useState('');
+  const [matrixRules, setMatrixRules] = useState([]);
+  const [newIncident, setNewIncident] = useState({ title: '', message: '', severity: 'HIGH', eventType: 'STUDENT_INCIDENT' });
+  const [submittingIncident, setSubmittingIncident] = useState(false);
+
+  // Super Admin Role Management State
+  const [staffAccounts, setStaffAccounts] = useState([]);
+  const [updatingUserRole, setUpdatingUserRole] = useState(null);
+
   useEffect(() => {
     if (!authLoading) {
       if (!user || user.role !== 'admin') {
@@ -106,6 +119,28 @@ export default function AdminPage() {
           if (feeRes.stats) setFeeStats(feeRes.stats);
         }
       } catch (fErr) { console.warn('Fees load error:', fErr.message); }
+
+      try {
+        const alertRes = await apiClient('/api/v1/alerts');
+        if (alertRes.success && alertRes.alerts) {
+          setAlertsList(alertRes.alerts);
+          if (alertRes.stats) setAlertStats(alertRes.stats);
+        }
+      } catch (aErr) { console.warn('Alerts load error:', aErr.message); }
+
+      try {
+        const matrixRes = await apiClient('/api/v1/alerts/matrix');
+        if (matrixRes.success && matrixRes.rules) {
+          setMatrixRules(matrixRes.rules);
+        }
+      } catch (mErr) { console.warn('Matrix load error:', mErr.message); }
+
+      try {
+        const rolesRes = await apiClient('/api/v1/admin/roles');
+        if (rolesRes.success && rolesRes.users) {
+          setStaffAccounts(rolesRes.users);
+        }
+      } catch (rErr) {}
     } catch (err) {
       setError(err.message);
     } finally {
@@ -193,19 +228,88 @@ export default function AdminPage() {
     }
   };
 
-  const handleDeleteFee = async (feeId) => {
-    if (!window.confirm('Delete this fee record?')) return;
+  const handleAlertAction = async (alertId, action) => {
     try {
-      await apiClient(`/api/admin/fees?id=${feeId}`, { method: 'DELETE' });
-      const feeRes = await apiClient('/api/admin/fees');
-      if (feeRes.success && feeRes.fees) {
-        setFeeLedger(feeRes.fees);
-        if (feeRes.stats) setFeeStats(feeRes.stats);
+      await apiClient('/api/v1/alerts', {
+        method: 'PUT',
+        body: JSON.stringify({ alertId, action }),
+      });
+      setMessage(`Alert marked as ${action}D.`);
+      const alertRes = await apiClient('/api/v1/alerts');
+      if (alertRes.success && alertRes.alerts) {
+        setAlertsList(alertRes.alerts);
+        if (alertRes.stats) setAlertStats(alertRes.stats);
       }
     } catch (err) {
-      setInvoiceError(err.message || 'Failed to delete fee record.');
+      setError(err.message || `Failed to ${action.toLowerCase()} alert.`);
     }
   };
+
+  const handleUpdateMatrixRule = async (ruleObj) => {
+    try {
+      await apiClient('/api/v1/alerts/matrix', {
+        method: 'PUT',
+        body: JSON.stringify(ruleObj),
+      });
+      setMessage(`Notification rule for ${ruleObj.eventType} updated.`);
+      const matrixRes = await apiClient('/api/v1/alerts/matrix');
+      if (matrixRes.success && matrixRes.rules) setMatrixRules(matrixRes.rules);
+    } catch (err) {
+      setError(err.message || 'Failed to update rule.');
+    }
+  };
+
+  const handleReportIncident = async (e) => {
+    e?.preventDefault();
+    if (!newIncident.title.trim() || !newIncident.message.trim()) {
+      setError('Title and message are required.');
+      return;
+    }
+    try {
+      setSubmittingIncident(true);
+      await apiClient('/api/v1/alerts', {
+        method: 'POST',
+        body: JSON.stringify(newIncident),
+      });
+      setMessage(`Alert "${newIncident.title.trim()}" dispatched!`);
+      setNewIncident({ title: '', message: '', severity: 'HIGH', eventType: 'STUDENT_INCIDENT' });
+      const alertRes = await apiClient('/api/v1/alerts');
+      if (alertRes.success && alertRes.alerts) {
+        setAlertsList(alertRes.alerts);
+        if (alertRes.stats) setAlertStats(alertRes.stats);
+      }
+    } catch (err) {
+      setError(err.message || 'Failed to dispatch incident alert.');
+    } finally {
+      setSubmittingIncident(false);
+    }
+  };
+
+  const handleUpdateUserRole = async (targetUserId, newRole) => {
+    try {
+      setUpdatingUserRole(targetUserId);
+      const res = await apiClient('/api/v1/admin/roles', {
+        method: 'PUT',
+        body: JSON.stringify({ targetUserId, newRole }),
+      });
+      setMessage(res.message || 'Account role updated.');
+      const rolesRes = await apiClient('/api/v1/admin/roles');
+      if (rolesRes.success && rolesRes.users) setStaffAccounts(rolesRes.users);
+    } catch (err) {
+      setError(err.message || 'Failed to update role.');
+    } finally {
+      setUpdatingUserRole(null);
+    }
+  };
+
+  const isSuperAdmin = user?.isSuperAdmin || (user?.roles || []).includes('SUPER_ADMIN') || user?.role === 'super_admin';
+
+  const filteredAlerts = alertsList.filter((a) => {
+    const matchesQuery = !q || a.title.toLowerCase().includes(q) || a.message.toLowerCase().includes(q) || a.eventType.toLowerCase().includes(q);
+    const matchesSeverity = !alertFilterSeverity || a.severity === alertFilterSeverity;
+    const matchesStatus = !alertFilterStatus || a.status === alertFilterStatus;
+    return matchesQuery && matchesSeverity && matchesStatus;
+  });
 
   const formatDate = (dateStr) => {
     if (!dateStr) return 'N/A';
@@ -1407,6 +1511,340 @@ export default function AdminPage() {
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* TAB: SMART ALERTS & ESCALATION ENGINE */}
+        {activeTab === 'alert-engine' && (
+          <div key="alert-engine" className="tab-content-animate">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <div>
+                <h2 style={{ fontSize: '22px', fontWeight: '800', color: 'var(--text-main)', margin: 0 }}>
+                  Smart Educational Alert &amp; Escalation Engine
+                </h2>
+                <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '4px 0 0' }}>
+                  Automated Event Detection • Multi-Channel Escalation Matrix • Dual-Admin Scoping
+                </p>
+              </div>
+              {isSuperAdmin && (
+                <span style={{ fontSize: '12px', fontWeight: '800', background: 'rgba(147, 51, 234, 0.15)', color: '#a855f7', border: '1px solid rgba(147, 51, 234, 0.3)', padding: '6px 14px', borderRadius: '20px' }}>
+                  👑 SUPER ADMIN SCOPE
+                </span>
+              )}
+            </div>
+
+            {/* Alert KPIs */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '20px', marginBottom: '28px' }}>
+              {[
+                { label: 'Active Alerts', value: alertStats.active || 0, sub: 'Needs acknowledgment', color: '#ffb703' },
+                { label: 'Escalated Alerts', value: alertStats.escalated || 0, sub: 'Level 2 / 3 Escalations', color: '#ff4d4d' },
+                { label: 'Acknowledged', value: alertStats.acknowledged || 0, sub: 'Under review', color: '#00f3ff' },
+                { label: 'Resolved Alerts', value: alertStats.resolved || 0, sub: 'Issue cleared', color: '#2bd49e' },
+              ].map((kpi, i) => (
+                <div key={i} className="glass-card" style={{ padding: '20px', textAlign: 'center' }}>
+                  <p style={{ fontSize: '28px', fontWeight: '900', color: kpi.color, margin: 0 }}>{kpi.value}</p>
+                  <p style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-main)', margin: '4px 0 2px' }}>{kpi.label}</p>
+                  <p style={{ fontSize: '11px', color: 'var(--text-muted)', margin: 0 }}>{kpi.sub}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Report Manual Incident Card */}
+            <div className="glass-card" style={{ padding: '24px', marginBottom: '28px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '16px' }}>
+                🚨 Report Student Incident or Facility Issue
+              </h3>
+              <form onSubmit={handleReportIncident}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px' }}>
+                  <div>
+                    <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>Event Type</label>
+                    <select
+                      className="input-field"
+                      value={newIncident.eventType}
+                      onChange={(e) => setNewIncident({ ...newIncident, eventType: e.target.value })}
+                    >
+                      <option value="STUDENT_INCIDENT">Student Incident / Discipline</option>
+                      <option value="FACILITY_ISSUE">Facility / Infrastructure Problem</option>
+                      <option value="REPEATED_ABSENCE">Attendance Escalation</option>
+                      <option value="GRADE_DROP">Academic Drop Alert</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>Alert Title</label>
+                    <input
+                      className="input-field"
+                      placeholder="e.g. Broken AC in Grade 8-B"
+                      value={newIncident.title}
+                      onChange={(e) => setNewIncident({ ...newIncident, title: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>Severity</label>
+                    <select
+                      className="input-field"
+                      value={newIncident.severity}
+                      onChange={(e) => setNewIncident({ ...newIncident, severity: e.target.value })}
+                    >
+                      <option value="LOW">Low</option>
+                      <option value="MEDIUM">Medium</option>
+                      <option value="HIGH">High</option>
+                      <option value="CRITICAL">Critical</option>
+                    </select>
+                  </div>
+                </div>
+                <div style={{ marginTop: '16px' }}>
+                  <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>Message Details</label>
+                  <textarea
+                    className="input-field"
+                    rows={2}
+                    placeholder="Provide full context for parent/teacher/admin alert notification..."
+                    value={newIncident.message}
+                    onChange={(e) => setNewIncident({ ...newIncident, message: e.target.value })}
+                    required
+                  />
+                </div>
+                <button type="submit" disabled={submittingIncident} className="btn-primary" style={{ marginTop: '16px', padding: '10px 24px' }}>
+                  {submittingIncident ? 'Dispatching...' : 'Dispatch Alert Notification'}
+                </button>
+              </form>
+            </div>
+
+            {/* Live Alerts Stream Card */}
+            <div className="glass-card" style={{ padding: '24px', marginBottom: '28px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '12px' }}>
+                <h3 style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-main)', margin: 0 }}>
+                  Active Alert Center &amp; Escalation Tracker
+                </h3>
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <select className="input-field" value={alertFilterSeverity} onChange={(e) => setAlertFilterSeverity(e.target.value)} style={{ padding: '6px 12px', fontSize: '12px' }}>
+                    <option value="">All Severities</option>
+                    <option value="LOW">Low</option>
+                    <option value="MEDIUM">Medium</option>
+                    <option value="HIGH">High</option>
+                    <option value="CRITICAL">Critical</option>
+                  </select>
+                  <select className="input-field" value={alertFilterStatus} onChange={(e) => setAlertFilterStatus(e.target.value)} style={{ padding: '6px 12px', fontSize: '12px' }}>
+                    <option value="">All Statuses</option>
+                    <option value="ACTIVE">Active</option>
+                    <option value="ESCALATED">Escalated</option>
+                    <option value="ACKNOWLEDGED">Acknowledged</option>
+                    <option value="RESOLVED">Resolved</option>
+                  </select>
+                </div>
+              </div>
+
+              {filteredAlerts.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '36px 20px', color: 'var(--text-muted)', fontSize: '14px' }}>
+                  <div style={{ fontSize: '32px', marginBottom: '8px' }}>🔔</div>
+                  No alert notifications match current criteria.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {filteredAlerts.map((a) => {
+                    const sevColor = { LOW: '#2bd49e', MEDIUM: '#ffb703', HIGH: '#ff4d4d', CRITICAL: '#e11d48' }[a.severity] || '#ffb703';
+                    const levelLabel = { 1: 'Level 1: Teacher/Parent', 2: 'Level 2: School Admin', 3: 'Level 3: Super Admin' }[a.escalationLevel] || `Level ${a.escalationLevel}`;
+                    const levelBg = a.escalationLevel === 3 ? 'rgba(225,29,72,0.15)' : a.escalationLevel === 2 ? 'rgba(255,183,3,0.15)' : 'rgba(43,212,158,0.15)';
+                    const levelTextColor = a.escalationLevel === 3 ? '#e11d48' : a.escalationLevel === 2 ? '#ffb703' : '#2bd49e';
+
+                    return (
+                      <div
+                        key={a._id}
+                        style={{
+                          background: 'var(--subcard-bg)',
+                          border: `1px solid ${a.status === 'ESCALATED' ? '#ff4d4d44' : 'var(--border-color)'}`,
+                          borderRadius: '12px',
+                          padding: '16px 20px',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          flexWrap: 'wrap',
+                          gap: '12px',
+                        }}
+                      >
+                        <div style={{ flex: 1, minWidth: '260px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px' }}>
+                            <span style={{ padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '800', background: `${sevColor}22`, color: sevColor }}>
+                              {a.severity}
+                            </span>
+                            <span style={{ padding: '2px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '700', background: levelBg, color: levelTextColor }}>
+                              {levelLabel}
+                            </span>
+                            <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                              Target: {a.targetRole || 'ADMIN'}
+                            </span>
+                          </div>
+                          <h4 style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-main)', margin: '0 0 4px' }}>
+                            {a.title}
+                          </h4>
+                          <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: 0, lineHeight: 1.4 }}>
+                            {a.message}
+                          </p>
+                          <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block', marginTop: '6px' }}>
+                            Issued: {formatDate(a.createdAt)} {a.acknowledgedAt && `| Ack: ${formatDate(a.acknowledgedAt)}`} {a.resolvedAt && `| Resolved: ${formatDate(a.resolvedAt)}`}
+                          </span>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          {a.status !== 'RESOLVED' && (
+                            <>
+                              {a.status === 'ACTIVE' && (
+                                <button
+                                  onClick={() => handleAlertAction(a._id, 'ACKNOWLEDGE')}
+                                  style={{ background: 'rgba(0,243,255,0.1)', color: '#00f3ff', border: '1px solid rgba(0,243,255,0.3)', padding: '6px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                                >
+                                  Acknowledge
+                                </button>
+                              )}
+                              <button
+                                onClick={() => handleAlertAction(a._id, 'RESOLVE')}
+                                style={{ background: 'rgba(43,212,158,0.15)', color: '#2bd49e', border: '1px solid rgba(43,212,158,0.3)', padding: '6px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                              >
+                                Mark Resolved
+                              </button>
+                            </>
+                          )}
+                          {a.status === 'RESOLVED' && (
+                            <span style={{ padding: '4px 12px', borderRadius: '12px', fontSize: '12px', fontWeight: '700', background: 'rgba(43,212,158,0.15)', color: '#2bd49e' }}>
+                              ✓ Resolved
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Notification Matrix Rule Configurator */}
+            <div className="glass-card" style={{ padding: '24px', marginBottom: '28px' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '16px' }}>
+                ⚙️ Notification Matrix &amp; Escalation Threshold Rules
+              </h3>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ background: 'rgba(0,243,255,0.06)' }}>
+                      {['Event Type', 'Severity', 'Parent', 'Teacher', 'Admin', 'Super Admin', 'Escalate After', 'Active'].map((h) => (
+                        <th key={h} style={{ padding: '12px 14px', textAlign: 'left', fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {matrixRules.map((rule, idx) => (
+                      <tr key={rule.id || idx} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                        <td style={{ padding: '12px 14px', fontWeight: '700', fontSize: '13px', color: 'var(--text-main)' }}>
+                          {rule.event_type}
+                        </td>
+                        <td style={{ padding: '12px 14px' }}>
+                          <span style={{ fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '10px', background: 'rgba(255,183,3,0.15)', color: '#ffb703' }}>
+                            {rule.severity}
+                          </span>
+                        </td>
+                        <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                          <input
+                            type="checkbox"
+                            checked={Boolean(rule.notify_parent)}
+                            onChange={(e) => handleUpdateMatrixRule({ ...rule, notifyParent: e.target.checked })}
+                          />
+                        </td>
+                        <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                          <input
+                            type="checkbox"
+                            checked={Boolean(rule.notify_teacher)}
+                            onChange={(e) => handleUpdateMatrixRule({ ...rule, notifyTeacher: e.target.checked })}
+                          />
+                        </td>
+                        <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                          <input
+                            type="checkbox"
+                            checked={Boolean(rule.notify_admin)}
+                            onChange={(e) => handleUpdateMatrixRule({ ...rule, notifyAdmin: e.target.checked })}
+                          />
+                        </td>
+                        <td style={{ padding: '12px 14px', textAlign: 'center' }}>
+                          <input
+                            type="checkbox"
+                            checked={Boolean(rule.notify_super_admin)}
+                            onChange={(e) => handleUpdateMatrixRule({ ...rule, notifySuperAdmin: e.target.checked })}
+                          />
+                        </td>
+                        <td style={{ padding: '12px 14px', fontSize: '12px', color: 'var(--text-muted)' }}>
+                          {rule.escalate_after_hours || 24} hours
+                        </td>
+                        <td style={{ padding: '12px 14px' }}>
+                          <input
+                            type="checkbox"
+                            checked={Boolean(rule.is_enabled !== false)}
+                            onChange={(e) => handleUpdateMatrixRule({ ...rule, isEnabled: e.target.checked })}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* SUPER ADMIN: Staff Role Management Card */}
+            {isSuperAdmin && (
+              <div className="glass-card" style={{ padding: '24px', border: '1px solid rgba(147, 51, 234, 0.3)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                  <div>
+                    <h3 style={{ fontSize: '16px', fontWeight: '700', color: '#a855f7', margin: 0 }}>
+                      👑 Super Admin Role Elevation &amp; Account Control
+                    </h3>
+                    <p style={{ fontSize: '12px', color: 'var(--text-muted)', margin: '2px 0 0' }}>
+                      Promote or demote staff between SUPER_ADMIN, ADMIN, TEACHER, and STUDENT roles.
+                    </p>
+                  </div>
+                  <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{staffAccounts.length} Staff Accounts</span>
+                </div>
+
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: 'rgba(147,51,234,0.08)' }}>
+                        {['Name', 'Email', 'Current Roles', 'Elevate / Change Role'].map((h) => (
+                          <th key={h} style={{ padding: '12px 14px', textAlign: 'left', fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {staffAccounts.map((acc) => {
+                        const isSa = acc.isSuperAdmin;
+                        return (
+                          <tr key={acc.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                            <td style={{ padding: '12px 14px', fontWeight: '700', color: 'var(--text-main)' }}>{acc.name}</td>
+                            <td style={{ padding: '12px 14px', fontSize: '13px', color: 'var(--text-muted)' }}>{acc.email}</td>
+                            <td style={{ padding: '12px 14px' }}>
+                              <span style={{ padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '800', background: isSa ? 'rgba(147,51,234,0.2)' : 'rgba(0,243,255,0.12)', color: isSa ? '#a855f7' : '#00f3ff' }}>
+                                {acc.roles.join(', ')}
+                              </span>
+                            </td>
+                            <td style={{ padding: '12px 14px' }}>
+                              <select
+                                className="input-field"
+                                value={acc.roles[0] || 'STUDENT'}
+                                disabled={updatingUserRole === acc.id}
+                                onChange={(e) => handleUpdateUserRole(acc.id, e.target.value)}
+                                style={{ width: '160px', padding: '4px 8px', fontSize: '12px' }}
+                              >
+                                <option value="SUPER_ADMIN">👑 SUPER_ADMIN</option>
+                                <option value="ADMIN">🛡️ ADMIN</option>
+                                <option value="TEACHER">🎓 TEACHER</option>
+                                <option value="STUDENT">📚 STUDENT</option>
+                              </select>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

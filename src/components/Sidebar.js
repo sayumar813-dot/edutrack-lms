@@ -8,7 +8,8 @@ import { useAuth } from '@/context/AuthContext';
 // Clean SVG icon set — sized at 18x18 for standard clarity
 const icons = {
   overview:    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>,
-  teachers:    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+  alerts:      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>,
+  teachers:    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
   students:    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c3 3 9 3 12 0v-5"/></svg>,
   classes:     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>,
   subjects:    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>,
@@ -69,17 +70,19 @@ export default function Sidebar({ activeTab, setActiveTab }) {
     setMobileOpen(false);
   };
 
-  // Intermediate balanced labels (not too long, not too short)
+  const isSuperAdmin = user?.isSuperAdmin || (user?.roles || []).includes('SUPER_ADMIN') || user?.role === 'super_admin';
+
   const adminNav = [
-    { id: 'dashboard',  label: 'Overview',           icon: 'overview' },
-    { id: 'teachers',   label: 'Teachers & Faculty', icon: 'teachers' },
-    { id: 'students',   label: 'Student Records',    icon: 'students' },
-    { id: 'classes',    label: 'Classes & Sections', icon: 'classes' },
-    { id: 'subjects',   label: 'Subject Listing',    icon: 'subjects' },
-    { id: 'sessions',   label: 'Academic Terms',     icon: 'sessions' },
-    { id: 'fees',       label: 'Fee Management',      icon: 'fees' },
-    { id: 'audit-logs', label: 'Audit Logs',         icon: 'audit' },
-    { id: 'reports',    label: 'System Reports',     icon: 'reports' },
+    { id: 'dashboard',    label: 'Overview',                icon: 'overview' },
+    { id: 'alert-engine', label: 'Alerts & Escalations',    icon: 'alerts' },
+    { id: 'teachers',     label: 'Teachers & Faculty',      icon: 'teachers' },
+    { id: 'students',     label: 'Student Records',         icon: 'students' },
+    { id: 'classes',      label: 'Classes & Sections',      icon: 'classes' },
+    { id: 'subjects',     label: 'Subject Listing',         icon: 'subjects' },
+    { id: 'sessions',     label: 'Academic Terms',          icon: 'sessions' },
+    { id: 'fees',         label: 'Fee Management',          icon: 'fees' },
+    { id: 'audit-logs',   label: 'Audit Logs',              icon: 'audit' },
+    { id: 'reports',      label: 'System Reports',          icon: 'reports' },
   ];
 
   const teacherNav = [
@@ -98,7 +101,9 @@ export default function Sidebar({ activeTab, setActiveTab }) {
   ];
 
   const initials = user?.name?.split(' ').map(w => w[0]).join('').slice(0,2).toUpperCase() || 'U';
-  const roleLabel = { admin: 'Administrator', teacher: 'Instructor', student: 'Student', parent: 'Guardian' }[user?.role] || 'User';
+  const roleLabel = isSuperAdmin
+    ? 'Super Admin'
+    : { admin: 'Administrator', teacher: 'Instructor', student: 'Student', parent: 'Guardian' }[user?.role] || 'User';
 
   return (
     <>
@@ -127,7 +132,7 @@ export default function Sidebar({ activeTab, setActiveTab }) {
           </button>
           <h2 style={{ fontSize: '18px', fontWeight: '800', color: 'var(--text-main)', margin: 0 }}>ScholarFlow</h2>
         </div>
-        <span style={{ fontSize: '13px', color: 'var(--primary-color)', fontWeight: '700', textTransform: 'uppercase' }}>{user?.role}</span>
+        <span style={{ fontSize: '13px', color: 'var(--primary-color)', fontWeight: '700', textTransform: 'uppercase' }}>{isSuperAdmin ? 'SUPER ADMIN' : user?.role}</span>
       </div>
 
       {/* Mobile Backdrop */}
@@ -169,12 +174,14 @@ export default function Sidebar({ activeTab, setActiveTab }) {
 
         {/* User Profile Card */}
         <div style={{ background: 'var(--subcard-bg)', border: '1px solid var(--border-color)', borderRadius: '14px', padding: '14px 16px', marginBottom: '22px', display: 'flex', alignItems: 'center', gap: '14px' }}>
-          <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'var(--primary-color)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '16px', flexShrink: 0 }}>
+          <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: isSuperAdmin ? '#9333ea' : 'var(--primary-color)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', fontSize: '16px', flexShrink: 0 }}>
             {initials}
           </div>
           <div style={{ overflow: 'hidden' }}>
             <p style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-main)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{user?.name || 'User'}</p>
-            <p style={{ fontSize: '13px', color: 'var(--primary-color)', margin: '2px 0 0 0', fontWeight: '600' }}>{roleLabel}</p>
+            <p style={{ fontSize: '13px', color: isSuperAdmin ? '#a855f7' : 'var(--primary-color)', margin: '2px 0 0 0', fontWeight: '700' }}>
+              {roleLabel} {isSuperAdmin && '👑'}
+            </p>
           </div>
         </div>
 
@@ -182,7 +189,7 @@ export default function Sidebar({ activeTab, setActiveTab }) {
         <div style={{ flex: 1, overflowY: 'auto' }}>
           <p style={{ fontSize: '12px', fontWeight: '800', color: 'var(--text-muted)', letterSpacing: '1.2px', textTransform: 'uppercase', marginBottom: '12px', paddingLeft: '8px' }}>Main Navigation</p>
 
-          {user?.role === 'admin' && (
+          {(user?.role === 'admin' || user?.role === 'super_admin' || isSuperAdmin) && (
             <nav style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               {adminNav.map(item => <NavBtn key={item.id} item={item} activeTab={activeTab} onClick={handleNavClick} />)}
             </nav>

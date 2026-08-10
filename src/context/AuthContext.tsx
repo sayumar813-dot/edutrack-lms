@@ -7,7 +7,10 @@ export interface AuthUser {
   id: string;
   name: string;
   email: string;
-  role: 'admin' | 'teacher' | 'student' | 'parent' | 'ADMIN' | 'TEACHER' | 'STUDENT' | 'PARENT';
+  role: string;
+  roles?: string[];
+  isSuperAdmin?: boolean;
+  isAdmin?: boolean;
   mustResetPassword?: boolean;
 }
 

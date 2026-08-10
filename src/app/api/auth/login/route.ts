@@ -1,18 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import { setAuthCookie } from '@/lib/jwt';
+import { createAdminClient } from '@/lib/supabase/server';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Local user store — no database required for auth.
-// Add more users here as needed. Passwords are bcrypt hashed (12 rounds).
-// Admin password: mubashir7661
-// ─────────────────────────────────────────────────────────────────────────────
 const LOCAL_USERS: {
   id: string;
   email: string;
   passwordHash: string;
   name: string;
   role: string;
+  roles: string[];
 }[] = [
   {
     id: 'admin-001',
@@ -20,6 +17,15 @@ const LOCAL_USERS: {
     passwordHash: '$2b$12$lx8tAhwo3PTjseYpUVf8IeNCWvUKwm4XJnYOg1scXNRZAyEGBKcly',
     name: 'Admin User',
     role: 'admin',
+    roles: ['SUPER_ADMIN', 'ADMIN'],
+  },
+  {
+    id: 'superadmin-001',
+    email: 'superadmin@edutrack.com',
+    passwordHash: '$2b$12$lx8tAhwo3PTjseYpUVf8IeNCWvUKwm4XJnYOg1scXNRZAyEGBKcly',
+    name: 'Super Administrator',
+    role: 'super_admin',
+    roles: ['SUPER_ADMIN'],
   },
 ];
 
@@ -36,50 +42,103 @@ export async function POST(req: NextRequest) {
     }
 
     const emailNorm = email.toLowerCase().trim();
+    let foundUser: any = null;
 
-    // Find user in local store
-    const userRecord = LOCAL_USERS.find(
-      (u) => u.email.toLowerCase() === emailNorm
-    );
+    // 1. Try checking live Supabase user_profiles
+    try {
+      const supabase = createAdminClient();
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('email', emailNorm)
+        .maybeSingle();
 
-    if (!userRecord) {
+      if (profile) {
+        // Authenticate password via Supabase Auth
+        const { data: authData, error: authErr } = await supabase.auth.signInWithPassword({
+          email: emailNorm,
+          password,
+        });
+
+        if (!authErr && authData?.user) {
+          const rolesArray = profile.roles || ['STUDENT'];
+          const primaryRole = rolesArray.includes('SUPER_ADMIN')
+            ? 'super_admin'
+            : rolesArray.includes('ADMIN')
+            ? 'admin'
+            : rolesArray[0]?.toLowerCase() || 'student';
+
+          foundUser = {
+            id: profile.id,
+            email: profile.email,
+            name: `${profile.first_name || ''} ${profile.last_name || ''}`.trim() || profile.email.split('@')[0],
+            role: primaryRole,
+            roles: rolesArray,
+          };
+        }
+      }
+    } catch (_) {}
+
+    // 2. Fallback to LOCAL_USERS if not authenticated via Supabase
+    if (!foundUser) {
+      const localRecord = LOCAL_USERS.find((u) => u.email.toLowerCase() === emailNorm);
+      if (localRecord) {
+        const passwordMatch = await bcrypt.compare(password, localRecord.passwordHash);
+        if (passwordMatch) {
+          foundUser = {
+            id: localRecord.id,
+            email: localRecord.email,
+            name: localRecord.name,
+            role: localRecord.role,
+            roles: localRecord.roles,
+          };
+        }
+      }
+    }
+
+    if (!foundUser) {
       return NextResponse.json(
         { error: 'Invalid email or password.' },
         { status: 401 }
       );
     }
 
-    // Verify password
-    const passwordMatch = await bcrypt.compare(password, userRecord.passwordHash);
-    if (!passwordMatch) {
-      return NextResponse.json(
-        { error: 'Invalid email or password.' },
-        { status: 401 }
-      );
+    // Role check validation if client passed a target role
+    if (role) {
+      const reqRole = role.toLowerCase();
+      const userRole = foundUser.role.toLowerCase();
+      const userRoles = (foundUser.roles || [userRole]).map((r: string) => r.toLowerCase());
+
+      const isSuperAdmin = userRoles.includes('super_admin');
+      const isAdmin = userRoles.includes('admin') || isSuperAdmin;
+
+      let match = false;
+      if (reqRole === 'admin' && isAdmin) match = true;
+      else if (reqRole === 'super_admin' && isSuperAdmin) match = true;
+      else if (userRoles.includes(reqRole)) match = true;
+
+      if (!match) {
+        return NextResponse.json(
+          { error: `Account registered as ${foundUser.role.toUpperCase()}, not ${role.toUpperCase()}.` },
+          { status: 401 }
+        );
+      }
     }
 
-    // Verify role if provided
-    if (role && userRecord.role.toLowerCase() !== role.toLowerCase()) {
-      return NextResponse.json(
-        {
-          error: `This account is registered as ${userRecord.role.toUpperCase()}, not ${role.toUpperCase()}. Please select the correct role.`,
-        },
-        { status: 401 }
-      );
-    }
-
-    // Set httpOnly JWT session cookie
+    // Set JWT Cookie
     await setAuthCookie({
-      userId: userRecord.id,
-      name: userRecord.name,
-      email: userRecord.email,
-      role: userRecord.role,
+      userId: foundUser.id,
+      name: foundUser.name,
+      email: foundUser.email,
+      role: foundUser.role,
+      roles: foundUser.roles,
     });
 
     return NextResponse.json({
       success: true,
-      name: userRecord.name,
-      role: userRecord.role,
+      name: foundUser.name,
+      role: foundUser.role,
+      roles: foundUser.roles,
       mustResetPassword: false,
     });
   } catch (error) {

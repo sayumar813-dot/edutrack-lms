@@ -3,7 +3,7 @@ import { getAuthCookie } from '@/lib/jwt';
 
 export async function GET(req: NextRequest) {
   try {
-    const session = await getAuthCookie();
+    const session = (await getAuthCookie()) as any;
 
     if (!session) {
       return NextResponse.json(
@@ -12,6 +12,10 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    const rolesArray: string[] = (session.roles as string[]) || [(session.role as string)?.toUpperCase() || 'STUDENT'];
+    const isSuperAdmin = rolesArray.includes('SUPER_ADMIN') || session.role === 'super_admin';
+    const isAdmin = rolesArray.includes('ADMIN') || isSuperAdmin || session.role === 'admin';
+
     return NextResponse.json({
       success: true,
       user: {
@@ -19,6 +23,9 @@ export async function GET(req: NextRequest) {
         name: session.name,
         email: session.email,
         role: session.role,
+        roles: rolesArray,
+        isSuperAdmin,
+        isAdmin,
         mustResetPassword: false,
       },
     });
