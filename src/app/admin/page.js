@@ -1783,11 +1783,11 @@ export default function AdminPage() {
                         </div>
 
                         <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                          {(a.attachment || a.title?.includes('Medical Note') || a.message?.includes('Doctor') || a.title?.includes('David Miller')) && (
+                          {(a.attachment || a.title?.includes('Medical Note') || a.message?.includes('Doctor')) && (
                             <button
                               type="button"
                               onClick={() => setSelectedAttachmentModal(a.attachment || {
-                                fileName: `Doctor_Medical_Certificate_${a.title?.split(': ')[1] || 'David_Miller'}.pdf`,
+                                fileName: `Doctor_Medical_Certificate_${(a.title?.split(': ')[1] || 'Medical_Note').replace(/\s+/g, '_')}.pdf`,
                                 fileType: 'application/pdf',
                                 fileSize: '485 KB',
                                 doctorName: 'Dr. Marcus Vance',
@@ -2392,7 +2392,7 @@ export default function AdminPage() {
                   <div style={{ padding: '20px 16px' }}>
                     <div style={{ fontSize: '48px', marginBottom: '12px' }}>📄 ⚕️</div>
                     <h4 style={{ color: '#00f3ff', fontSize: '18px', fontWeight: '800', margin: '0 0 6px 0' }}>
-                      {selectedAttachmentModal.fileName || 'Doctor_Certificate_David_Miller.pdf'}
+                      {selectedAttachmentModal.fileName || 'Official_Medical_Certificate.pdf'}
                     </h4>
                     <p style={{ color: '#94a3b8', fontSize: '13px', margin: 0 }}>
                       Official Medical Rest Certificate &amp; Prescription (File Size: {selectedAttachmentModal.fileSize || '485 KB'})

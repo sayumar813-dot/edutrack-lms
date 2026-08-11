@@ -13,6 +13,16 @@ export default function ParentWardProfilePage() {
   const [selectedWardIndex, setSelectedWardIndex] = useState(0);
   const [loading, setLoading] = useState(true);
 
+  const activeWard = wards[selectedWardIndex] || {
+    name: 'Student Ward Profile',
+    rollNumber: 'STU-1003',
+    class: 'Grade 10 - Section A',
+    attendancePercentage: 95,
+    pendingBalance: 0,
+    recentGrade: 'A',
+    hasAbsenceWarning: false,
+  };
+
   // Medical note form state
   const [medicalForm, setMedicalForm] = useState({
     noteTitle: 'Severe Fever & Doctor Advised Rest',
@@ -23,11 +33,12 @@ export default function ParentWardProfilePage() {
     details: 'Student presented with high viral fever (102°F). Prescribed 3 days bed rest and medication.',
   });
   const [attachment, setAttachment] = useState({
-    fileName: 'Doctor_Certificate_David_Miller.pdf',
+    fileName: `Doctor_Certificate_${(activeWard.name || 'Student').replace(/\s+/g, '_')}.pdf`,
     fileType: 'application/pdf',
     fileData: 'data:application/pdf;base64,JVBERi0xLjQK',
     fileSize: '485 KB',
   });
+
   const [submittingNote, setSubmittingNote] = useState(false);
   const [feedback, setFeedback] = useState({ error: '', success: '' });
 
@@ -46,33 +57,15 @@ export default function ParentWardProfilePage() {
     reader.readAsDataURL(file);
   };
 
+  // Sync attachment filename when activeWard changes
   useEffect(() => {
-    fetchWards();
-  }, []);
-
-  const fetchWards = async () => {
-    try {
-      setLoading(true);
-      const res = await apiClient('/api/v1/parent/wards');
-      if (res.success && res.data) {
-        setWards(res.data);
-      }
-    } catch (err) {
-      console.warn('Failed to load wards:', err.message);
-    } finally {
-      setLoading(false);
+    if (activeWard?.name) {
+      setAttachment((prev) => ({
+        ...prev,
+        fileName: `Doctor_Certificate_${activeWard.name.replace(/\s+/g, '_')}.pdf`,
+      }));
     }
-  };
-
-  const activeWard = wards[selectedWardIndex] || {
-    name: 'Student Ward Profile',
-    rollNumber: 'STU-1003',
-    class: 'Grade 10 - Section A',
-    attendancePercentage: 95,
-    pendingBalance: 0,
-    recentGrade: 'A',
-    hasAbsenceWarning: false,
-  };
+  }, [activeWard?.name]);
 
   const handleSubmitMedicalNote = async (e) => {
     e.preventDefault();
