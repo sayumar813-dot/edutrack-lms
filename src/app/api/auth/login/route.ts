@@ -54,13 +54,24 @@ export async function POST(req: NextRequest) {
         .maybeSingle();
 
       if (profile) {
-        // Authenticate password via Supabase Auth
-        const { data: authData, error: authErr } = await supabase.auth.signInWithPassword({
-          email: emailNorm,
-          password,
-        });
+        let authenticated = false;
 
-        if (!authErr && authData?.user) {
+        // 1a. Try Supabase Auth
+        try {
+          const { data: authData, error: authErr } = await supabase.auth.signInWithPassword({
+            email: emailNorm,
+            password,
+          });
+          if (!authErr && authData?.user) authenticated = true;
+        } catch (_) {}
+
+        // 1b. Fallback: check profile.password_hash via bcrypt
+        if (!authenticated && profile.password_hash) {
+          const match = await bcrypt.compare(password, profile.password_hash);
+          if (match) authenticated = true;
+        }
+
+        if (authenticated) {
           const rolesArray = profile.roles || ['STUDENT'];
           const primaryRole = rolesArray.includes('SUPER_ADMIN')
             ? 'super_admin'

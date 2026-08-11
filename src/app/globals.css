@@ -345,3 +345,59 @@ html {
     margin: 0 auto 16px;
 }
 
+/* ── Clean Print Engine Rules ───────────────────────────────────────────── */
+@media print {
+    /* Hide all non-printable UI chrome: sidebars, top headers, search bars, inputs, forms, buttons */
+    .sidebar-desktop,
+    .sidebar-mobile,
+    .sidebar-container,
+    .page-header-bar,
+    .top-nav-bar,
+    .action-btn,
+    .theme-toggle-btn,
+    .no-print,
+    .form-responsive,
+    .tab-navigation-bar,
+    .search-bar-container,
+    button:not(.printable-keep),
+    form:not(.printable-keep),
+    input:not(.printable-keep),
+    select:not(.printable-keep),
+    nav,
+    header {
+        display: none !important;
+    }
+
+    body, html, .app-container, .app-main {
+        background: #ffffff !important;
+        color: #111827 !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        width: 100% !important;
+        min-height: auto !important;
+    }
+
+    .glass-card {
+        background: #ffffff !important;
+        border: 1px solid #e5e7eb !important;
+        box-shadow: none !important;
+        color: #111827 !important;
+        padding: 20px !important;
+        margin-bottom: 16px !important;
+        page-break-inside: avoid;
+    }
+
+    table {
+        width: 100% !important;
+        border-collapse: collapse !important;
+        color: #111827 !important;
+    }
+
+    th, td {
+        border-bottom: 1px solid #e5e7eb !important;
+        color: #111827 !important;
+        padding: 10px 12px !important;
+    }
+}
+

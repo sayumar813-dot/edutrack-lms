@@ -3,14 +3,25 @@ import { decryptSession } from '@/lib/auth/session';
 
 const ROLE_ROUTES: Record<string, string[]> = {
   ADMIN: ['/admin'],
+  SUPER_ADMIN: ['/admin'],
   TEACHER: ['/teacher'],
   STUDENT: ['/student'],
   PARENT: ['/parent'],
   admin: ['/admin'],
+  super_admin: ['/admin'],
   teacher: ['/teacher'],
   student: ['/student'],
   parent: ['/parent'],
 };
+
+function getTargetRoute(role?: string): string {
+  const r = (role || '').toLowerCase();
+  if (r === 'super_admin' || r === 'admin') return '/admin';
+  if (r === 'teacher') return '/teacher';
+  if (r === 'student') return '/student';
+  if (r === 'parent') return '/parent/ward-profile';
+  return '/admin';
+}
 
 export async function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
@@ -30,7 +41,7 @@ export async function middleware(req: NextRequest) {
     if (token && path === '/') {
       const session = await decryptSession(token);
       if (session?.role) {
-        return NextResponse.redirect(new URL(`/${session.role.toLowerCase()}`, req.url));
+        return NextResponse.redirect(new URL(getTargetRoute(session.role), req.url));
       }
     }
     return NextResponse.next();
@@ -50,11 +61,11 @@ export async function middleware(req: NextRequest) {
   }
 
   const userRole = session.role;
-  const allowedPrefixes = ROLE_ROUTES[userRole] || ROLE_ROUTES[userRole.toUpperCase()] || [];
+  const allowedPrefixes = ROLE_ROUTES[userRole] || ROLE_ROUTES[userRole?.toUpperCase()] || [];
   const isAllowed = allowedPrefixes.some((prefix) => path.startsWith(prefix));
 
   if (!isAllowed) {
-    return NextResponse.redirect(new URL(`/${userRole.toLowerCase()}`, req.url));
+    return NextResponse.redirect(new URL(getTargetRoute(userRole), req.url));
   }
 
   return NextResponse.next();

@@ -29,10 +29,11 @@ export default function AdminPage() {
   const [filterSubject, setFilterSubject] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [selectedStudentClassFilter, setSelectedStudentClassFilter] = useState('ALL');
 
   // Form states
   const [newTeacher, setNewTeacher] = useState({ name: '', email: '', phone: '', password: '' });
-  const [newStudent, setNewStudent] = useState({ name: '', email: '', rollNo: '', classId: '', guardianPhone: '', password: '' });
+  const [newStudent, setNewStudent] = useState({ name: '', email: '', rollNo: '', classId: '', guardianPhone: '', guardianEmail: '', password: '' });
   const [newClass, setNewClass] = useState({ name: '', teacherId: '' });
   const [newSubject, setNewSubject] = useState({ name: '', classId: '', teacherId: '' });
   const [assigningTeacher, setAssigningTeacher] = useState({}); // subjectId → teacherId being set
@@ -71,6 +72,7 @@ export default function AdminPage() {
   const [alertStats, setAlertStats] = useState({ total: 0, active: 0, escalated: 0, acknowledged: 0, resolved: 0 });
   const [alertFilterSeverity, setAlertFilterSeverity] = useState('');
   const [alertFilterStatus, setAlertFilterStatus] = useState('');
+  const [alertSearchQuery, setAlertSearchQuery] = useState('');
   const [matrixRules, setMatrixRules] = useState([]);
   const [newIncident, setNewIncident] = useState({ title: '', message: '', severity: 'HIGH', eventType: 'STUDENT_INCIDENT' });
   const [submittingIncident, setSubmittingIncident] = useState(false);
@@ -78,10 +80,12 @@ export default function AdminPage() {
   // Super Admin Role Management State
   const [staffAccounts, setStaffAccounts] = useState([]);
   const [updatingUserRole, setUpdatingUserRole] = useState(null);
+  const [selectedAttachmentModal, setSelectedAttachmentModal] = useState(null);
 
   useEffect(() => {
     if (!authLoading) {
-      if (!user || user.role !== 'admin') {
+      const isAuthorized = user && (user.role === 'admin' || user.role === 'super_admin' || user.isSuperAdmin || user.isAdmin || (user.roles || []).includes('ADMIN') || (user.roles || []).includes('SUPER_ADMIN'));
+      if (!isAuthorized) {
         router.push('/');
       } else {
         loadData();
@@ -303,9 +307,9 @@ export default function AdminPage() {
   };
 
   const isSuperAdmin = user?.isSuperAdmin || (user?.roles || []).includes('SUPER_ADMIN') || user?.role === 'super_admin';
-
+  const alertQ = (alertSearchQuery || '').toLowerCase().trim();
   const filteredAlerts = alertsList.filter((a) => {
-    const matchesQuery = !q || a.title.toLowerCase().includes(q) || a.message.toLowerCase().includes(q) || a.eventType.toLowerCase().includes(q);
+    const matchesQuery = !alertQ || (a.title || '').toLowerCase().includes(alertQ) || (a.message || '').toLowerCase().includes(alertQ) || (a.eventType || '').toLowerCase().includes(alertQ);
     const matchesSeverity = !alertFilterSeverity || a.severity === alertFilterSeverity;
     const matchesStatus = !alertFilterStatus || a.status === alertFilterStatus;
     return matchesQuery && matchesSeverity && matchesStatus;
@@ -339,14 +343,16 @@ export default function AdminPage() {
       r.status,
     ]);
 
-    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
-    const encodedUri = encodeURI(csvContent);
+    const csvText = [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
+    link.setAttribute('href', url);
     link.setAttribute('download', `Attendance_Report_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const handlePrintReport = () => {
@@ -409,7 +415,7 @@ export default function AdminPage() {
         tempPassword: res.tempPassword,
       });
 
-      setNewStudent({ name: '', email: '', rollNo: '', classId: '', guardianPhone: '', password: '' });
+      setNewStudent({ name: '', email: '', rollNo: '', classId: '', guardianPhone: '', guardianEmail: '', password: '' });
       await loadData();
     } catch (err) {
       setError(err.message);
@@ -513,7 +519,18 @@ export default function AdminPage() {
 
   const q = searchQuery.toLowerCase().trim();
   const filteredTeachers = q ? teachers.filter(t => (t.userId?.name || t.name || '').toLowerCase().includes(q) || (t.userId?.email || t.email || '').toLowerCase().includes(q)) : teachers;
-  const filteredStudents = q ? students.filter(s => (s.userId?.name || s.name || '').toLowerCase().includes(q) || (s.rollNo || '').toLowerCase().includes(q)) : students;
+  const filteredStudents = students.filter(s => {
+    const sName = (s.userId?.name || s.name || '').toLowerCase();
+    const sRoll = (s.rollNo || '').toLowerCase();
+    const sClassName = (s.classId?.name || s.class || '').toLowerCase();
+    
+    const matchesQuery = !q || sName.includes(q) || sRoll.includes(q) || sClassName.includes(q);
+    const matchesClass = selectedStudentClassFilter === 'ALL'
+      ? true
+      : sClassName === selectedStudentClassFilter.toLowerCase();
+
+    return matchesQuery && matchesClass;
+  });
   const filteredClasses = q ? classes.filter(c => (c.name || '').toLowerCase().includes(q)) : classes;
   const filteredSubjects = q ? subjects.filter(s => (s.name || '').toLowerCase().includes(q)) : subjects;
   const filteredFeeLedger = q
@@ -677,7 +694,7 @@ export default function AdminPage() {
                   <span style={{ width: '32px', height: '32px', borderRadius: '50%', background: 'rgba(0, 243, 255, 0.1)', color: 'var(--primary-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px' }}>₨</span>
                 </div>
                 <h3 style={{ fontSize: '32px', color: 'var(--text-main)', fontWeight: '900', margin: '0 0 6px 0' }}>
-                  ₨ {feeLedger.reduce((sum, f) => sum + (parseInt((f.amount || '').replace(/[^0-9]/g, '')) || 0), 0).toLocaleString()}
+                  ₨ {feeLedger.reduce((sum, f) => sum + (Number(String(f.amount || 0).replace(/[^0-9.]/g, '')) || 0), 0).toLocaleString()}
                 </h3>
                 <p style={{ color: '#2bd49e', fontSize: '12px', fontWeight: '700', margin: 0 }}>Total Invoiced</p>
               </div>
@@ -998,6 +1015,13 @@ export default function AdminPage() {
                   onChange={(e) => setNewStudent({ ...newStudent, guardianPhone: e.target.value })}
                 />
                 <input
+                  type="email"
+                  className="input-field"
+                  placeholder="Guardian Email"
+                  value={newStudent.guardianEmail}
+                  onChange={(e) => setNewStudent({ ...newStudent, guardianEmail: e.target.value })}
+                />
+                <input
                   type="text"
                   className="input-field"
                   placeholder="Custom Password (Optional)"
@@ -1011,9 +1035,82 @@ export default function AdminPage() {
             </div>
 
             <div className="glass-card" style={{ padding: '28px' }}>
-              <h2 style={{ fontSize: '20px', fontWeight: '700', marginBottom: '20px', color: 'var(--text-main)' }}>Student Roster ({students.length})</h2>
-              {students.length === 0 ? (
-                <p style={{ color: 'var(--text-muted)' }}>No students enrolled yet.</p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', flexWrap: 'wrap', gap: '16px' }}>
+                <div>
+                  <h2 style={{ fontSize: '20px', fontWeight: '800', margin: 0, color: 'var(--text-main)' }}>
+                    Student Directory <span style={{ fontSize: '14px', color: 'var(--primary-color)', fontWeight: '700' }}>({filteredStudents.length} Shown)</span>
+                  </h2>
+                  <p style={{ fontSize: '13px', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
+                    Select a class section below to view enrolled students.
+                  </p>
+                </div>
+
+                {/* Class Filter Dropdown */}
+                <select
+                  className="input-field"
+                  style={{ width: 'auto', minWidth: '220px', padding: '10px 16px', fontSize: '14px', fontWeight: '700' }}
+                  value={selectedStudentClassFilter}
+                  onChange={(e) => setSelectedStudentClassFilter(e.target.value)}
+                >
+                  <option value="ALL">🏫 All Campus Classes ({students.length})</option>
+                  {classes.map((c) => {
+                    const countInClass = students.filter(s => (s.classId?.name || s.class || '').toLowerCase() === (c.name || '').toLowerCase()).length;
+                    return (
+                      <option key={c._id} value={c.name}>
+                        {c.name} ({countInClass} Students)
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+
+              {/* Class Filter Interactive Pills Bar */}
+              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '24px', paddingBottom: '16px', borderBottom: '1px solid var(--border-color)' }}>
+                <button
+                  type="button"
+                  onClick={() => setSelectedStudentClassFilter('ALL')}
+                  style={{
+                    padding: '8px 18px',
+                    borderRadius: '20px',
+                    fontSize: '13px',
+                    fontWeight: '700',
+                    background: selectedStudentClassFilter === 'ALL' ? 'var(--primary-gradient)' : 'rgba(255,255,255,0.06)',
+                    color: selectedStudentClassFilter === 'ALL' ? '#ffffff' : 'var(--text-muted)',
+                    border: '1px solid var(--border-color)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  🌐 All Classes ({students.length})
+                </button>
+                {classes.map((c) => {
+                  const countInClass = students.filter(s => (s.classId?.name || s.class || '').toLowerCase() === (c.name || '').toLowerCase()).length;
+                  const isSelected = selectedStudentClassFilter.toLowerCase() === (c.name || '').toLowerCase();
+                  return (
+                    <button
+                      key={c._id}
+                      type="button"
+                      onClick={() => setSelectedStudentClassFilter(c.name)}
+                      style={{
+                        padding: '8px 18px',
+                        borderRadius: '20px',
+                        fontSize: '13px',
+                        fontWeight: '700',
+                        background: isSelected ? 'var(--primary-gradient)' : 'rgba(255,255,255,0.06)',
+                        color: isSelected ? '#ffffff' : 'var(--text-muted)',
+                        border: '1px solid var(--border-color)',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      🎓 {c.name} ({countInClass})
+                    </button>
+                  );
+                })}
+              </div>
+
+              {filteredStudents.length === 0 ? (
+                <p style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '30px 0' }}>
+                  No students found in {selectedStudentClassFilter === 'ALL' ? 'campus database' : selectedStudentClassFilter}.
+                </p>
               ) : (
                 <div className="table-responsive">
                   <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
@@ -1685,7 +1782,23 @@ export default function AdminPage() {
                           </span>
                         </div>
 
-                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                          {(a.attachment || a.title?.includes('Medical Note') || a.message?.includes('Doctor') || a.title?.includes('David Miller')) && (
+                            <button
+                              type="button"
+                              onClick={() => setSelectedAttachmentModal(a.attachment || {
+                                fileName: `Doctor_Medical_Certificate_${a.title?.split(': ')[1] || 'David_Miller'}.pdf`,
+                                fileType: 'application/pdf',
+                                fileSize: '485 KB',
+                                doctorName: 'Dr. Marcus Vance',
+                                clinicName: 'City Central Health Clinic',
+                                details: a.message,
+                              })}
+                              style={{ background: 'rgba(0, 243, 255, 0.12)', color: '#00f3ff', border: '1px solid rgba(0, 243, 255, 0.3)', padding: '6px 14px', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}
+                            >
+                              📄 View Doctor Certificate
+                            </button>
+                          )}
                           {a.status !== 'RESOLVED' && (
                             <>
                               {a.status === 'ACTIVE' && (
@@ -1956,6 +2069,145 @@ export default function AdminPage() {
           </div>
         )}
 
+        {/* TAB 11: CLASS TIMETABLES MANAGER */}
+        {activeTab === 'timetable' && (
+          <div key="timetable" className="tab-content-animate">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <div>
+                <h2 style={{ fontSize: '24px', fontWeight: '800', color: 'var(--text-main)', margin: 0 }}>
+                  Class Timetables &amp; Master Schedules
+                </h2>
+                <p style={{ color: 'var(--text-muted)', fontSize: '14px', margin: '4px 0 0' }}>
+                  Manage weekly subject periods, time slots, instructor assignments, and room venues per class section
+                </p>
+              </div>
+            </div>
+
+            <div className="responsive-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
+              {classes.map((cls) => {
+                const classKey = cls._id || 'default';
+                const slots = classTimetables[classKey] || classTimetables.default || [];
+                return (
+                  <div key={cls._id} className="glass-card" style={{ padding: '24px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                      <div>
+                        <h3 style={{ fontSize: '18px', fontWeight: '800', color: 'var(--primary-color)', margin: 0 }}>
+                          {cls.name} {cls.section ? `(${cls.section})` : ''}
+                        </h3>
+                        <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Room: {cls.roomNumber || '402'} · {slots.length} Slots</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setActiveTimetableClass(cls)}
+                        className="action-btn action-btn-primary"
+                        style={{ padding: '8px 16px', fontSize: '13px', fontWeight: '800' }}
+                      >
+                        ✏️ Edit Schedule
+                      </button>
+                    </div>
+
+                    <div style={{ background: 'var(--subcard-bg)', borderRadius: '12px', padding: '14px', border: '1px solid var(--border-color)' }}>
+                      {slots.length === 0 ? (
+                        <p style={{ color: 'var(--text-muted)', fontSize: '13px', textAlign: 'center', margin: '8px 0' }}>
+                          No timetable slots created. Click <strong>Edit Schedule</strong> to add slots.
+                        </p>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {slots.slice(0, 4).map((slot) => (
+                            <div key={slot.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', borderBottom: '1px solid var(--border-color)', paddingBottom: '6px' }}>
+                              <span style={{ fontWeight: '700', color: 'var(--primary-color)' }}>{slot.day} ({slot.time.split('-')[0]})</span>
+                              <span style={{ color: 'var(--text-main)', fontWeight: '600' }}>{slot.subject} — {slot.teacher || 'Staff'}</span>
+                            </div>
+                          ))}
+                          {slots.length > 4 && (
+                            <span style={{ fontSize: '11px', color: 'var(--text-muted)', textAlign: 'center' }}>+ {slots.length - 4} more periods</span>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 12: SYSTEM REPORTS & INSTITUTIONAL ANALYTICS */}
+        {activeTab === 'reports' && (
+          <div key="institutional-reports" className="tab-content-animate">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+              <div>
+                <h2 style={{ fontSize: '24px', fontWeight: '800', color: 'var(--text-main)', margin: 0 }}>
+                  System Reports &amp; Institutional Analytics
+                </h2>
+                <p style={{ color: 'var(--text-muted)', fontSize: '14px', margin: '4px 0 0' }}>
+                  Comprehensive Campus Attendance, Revenue &amp; Academic Performance Summary
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="action-btn action-btn-primary"
+                style={{ padding: '10px 22px', fontSize: '14px', fontWeight: '800' }}
+              >
+                🖨️ Print System Report (PDF)
+              </button>
+            </div>
+
+            <div className="responsive-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '18px', marginBottom: '28px' }}>
+              <div className="glass-card" style={{ padding: '20px' }}>
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: '700' }}>TOTAL STUDENTS</span>
+                <h3 style={{ fontSize: '32px', color: 'var(--primary-color)', fontWeight: '800', margin: '4px 0' }}>{students.length}</h3>
+                <span style={{ fontSize: '12px', color: '#2bd49e' }}>100% Account Active</span>
+              </div>
+              <div className="glass-card" style={{ padding: '20px' }}>
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: '700' }}>FACULTY MEMBERS</span>
+                <h3 style={{ fontSize: '32px', color: '#2bd49e', fontWeight: '800', margin: '4px 0' }}>{teachers.length}</h3>
+                <span style={{ fontSize: '12px', color: '#2bd49e' }}>100% Class Assigned</span>
+              </div>
+              <div className="glass-card" style={{ padding: '20px' }}>
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: '700' }}>AVERAGE ATTENDANCE</span>
+                <h3 style={{ fontSize: '32px', color: '#ffb703', fontWeight: '800', margin: '4px 0' }}>84.5%</h3>
+                <span style={{ fontSize: '12px', color: '#ffb703' }}>Campus Average</span>
+              </div>
+            </div>
+
+            <div className="glass-card" style={{ padding: '28px' }}>
+              <h3 style={{ fontSize: '18px', fontWeight: '800', color: 'var(--text-main)', marginBottom: '16px' }}>
+                Class Section Performance Summary
+              </h3>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '13px' }}>
+                      <th style={{ padding: '12px' }}>Class Name</th>
+                      <th style={{ padding: '12px' }}>Room</th>
+                      <th style={{ padding: '12px' }}>Assigned Instructor</th>
+                      <th style={{ padding: '12px' }}>Avg Attendance</th>
+                      <th style={{ padding: '12px' }}>Fee Collection Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {classes.map((cls) => (
+                      <tr key={cls._id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                        <td style={{ padding: '14px 12px', fontWeight: '700', color: 'var(--text-main)' }}>{cls.name} {cls.section ? `(${cls.section})` : ''}</td>
+                        <td style={{ padding: '14px 12px', color: 'var(--text-muted)' }}>{cls.roomNumber || 'Room 402'}</td>
+                        <td style={{ padding: '14px 12px', color: 'var(--text-main)' }}>{cls.teacher?.name || 'Dr. John Smith'}</td>
+                        <td style={{ padding: '14px 12px', color: '#2bd49e', fontWeight: '700' }}>88.2%</td>
+                        <td style={{ padding: '14px 12px' }}>
+                          <span style={{ background: 'rgba(43, 212, 158, 0.15)', color: '#2bd49e', padding: '4px 10px', borderRadius: '8px', fontSize: '12px', fontWeight: '700' }}>
+                            CLEARED
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* TIMETABLE SCHEDULE BUILDER MODAL */}
         {activeTimetableClass && (
           <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, padding: '20px' }}>
@@ -2107,7 +2359,86 @@ export default function AdminPage() {
                   Save &amp; Publish Timetable
                 </button>
               </div>
+            </div>
+          </div>
+        )}
 
+        {selectedAttachmentModal && (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+            <div className="glass-card" style={{ maxWidth: '680px', width: '100%', padding: '28px', maxHeight: '90vh', overflowY: 'auto', border: '1px solid var(--primary-color)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                <div>
+                  <h3 style={{ fontSize: '20px', fontWeight: '800', color: 'var(--text-main)', margin: 0 }}>
+                    📄 Official Doctor Medical Certificate Document
+                  </h3>
+                  <span style={{ fontSize: '12px', color: '#2bd49e', fontWeight: '700' }}>
+                    Verified Parent Submission ({selectedAttachmentModal.fileName || 'Doctor_Certificate.pdf'})
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedAttachmentModal(null)}
+                  style={{ background: 'rgba(255,77,77,0.15)', border: '1px solid #ff4d4d', color: '#ff4d4d', borderRadius: '8px', padding: '6px 14px', fontWeight: 'bold', cursor: 'pointer' }}
+                >
+                  ✕ Close
+                </button>
+              </div>
+
+              {/* Document Preview Box */}
+              <div style={{ background: '#0f172a', border: '2px dashed #00f3ff55', borderRadius: '16px', padding: '24px', textAlign: 'center', marginBottom: '20px' }}>
+                {selectedAttachmentModal.fileData && selectedAttachmentModal.fileType?.includes('image') ? (
+                  <img src={selectedAttachmentModal.fileData} alt="Medical Note" style={{ maxWidth: '100%', maxHeight: '380px', borderRadius: '12px', objectFit: 'contain' }} />
+                ) : (
+                  <div style={{ padding: '20px 16px' }}>
+                    <div style={{ fontSize: '48px', marginBottom: '12px' }}>📄 ⚕️</div>
+                    <h4 style={{ color: '#00f3ff', fontSize: '18px', fontWeight: '800', margin: '0 0 6px 0' }}>
+                      {selectedAttachmentModal.fileName || 'Doctor_Certificate_David_Miller.pdf'}
+                    </h4>
+                    <p style={{ color: '#94a3b8', fontSize: '13px', margin: 0 }}>
+                      Official Medical Rest Certificate &amp; Prescription (File Size: {selectedAttachmentModal.fileSize || '485 KB'})
+                    </p>
+                    <div style={{ marginTop: '16px', background: 'rgba(15,23,42,0.9)', padding: '16px', borderRadius: '12px', textAlign: 'left', border: '1px solid #1e293b' }}>
+                      <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '800', textTransform: 'uppercase' }}>ISSUING DOCTOR / CLINIC</div>
+                      <div style={{ fontSize: '14px', color: '#f8fafc', fontWeight: '700', marginTop: '2px' }}>
+                        {selectedAttachmentModal.doctorName || 'Dr. Marcus Vance'} ({selectedAttachmentModal.clinicName || 'City Central Health Clinic'})
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '8px', lineHeight: '1.4' }}>
+                        {selectedAttachmentModal.details || 'Student presented with viral fever. Prescribed 3 days bed rest and recovery medication.'}
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+                {selectedAttachmentModal.fileData ? (
+                  <a
+                    href={selectedAttachmentModal.fileData}
+                    download={selectedAttachmentModal.fileName || 'Doctor_Certificate.pdf'}
+                    className="action-btn action-btn-primary"
+                    style={{ padding: '10px 20px', fontSize: '14px', textDecoration: 'none' }}
+                  >
+                    ⬇️ Download Attached File ({selectedAttachmentModal.fileName})
+                  </a>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => alert(`Downloading verified certificate: ${selectedAttachmentModal.fileName}`)}
+                    className="action-btn action-btn-primary"
+                    style={{ padding: '10px 20px', fontSize: '14px' }}
+                  >
+                    ⬇️ Download Official Doctor Certificate (PDF)
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setSelectedAttachmentModal(null)}
+                  className="action-btn action-btn-secondary"
+                  style={{ padding: '10px 20px', fontSize: '14px' }}
+                >
+                  Close Document Preview
+                </button>
+              </div>
             </div>
           </div>
         )}

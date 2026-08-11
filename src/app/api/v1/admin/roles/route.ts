@@ -80,9 +80,10 @@ export async function PUT(req: NextRequest) {
     }
 
     // Update user_profiles roles array
+    const updatedRoles = roleUpper === 'SUPER_ADMIN' ? ['SUPER_ADMIN', 'ADMIN'] : [roleUpper];
     const { data: updated, error } = await supabase
       .from('user_profiles')
-      .update({ roles: [roleUpper] })
+      .update({ roles: updatedRoles })
       .eq('id', targetUserId)
       .select()
       .single();

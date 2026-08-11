@@ -204,7 +204,7 @@ export class AlertService {
           .maybeSingle();
 
         const maxHours = rule?.escalate_after_hours || 24;
-        const alertAgeHours = (now - new Date(alert.updated_at).getTime()) / (1000 * 60 * 60);
+        const alertAgeHours = (now - new Date(alert.created_at || alert.updated_at).getTime()) / (1000 * 60 * 60);
 
         if (alertAgeHours >= maxHours) {
           const nextLevel = Math.min(3, (alert.escalation_level || 1) + 1);

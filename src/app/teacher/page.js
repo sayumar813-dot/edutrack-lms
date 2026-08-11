@@ -32,6 +32,85 @@ export default function TeacherPage() {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
+  // Assignment publishing state
+  const [assignmentTitle, setAssignmentTitle] = useState('');
+  const [assignmentDueDate, setAssignmentDueDate] = useState('');
+  const [assignmentDesc, setAssignmentDesc] = useState('');
+  const [assignmentAttachment, setAssignmentAttachment] = useState(null);
+  const [publishingAssignment, setPublishingAssignment] = useState(false);
+  const [recentAssignments, setRecentAssignments] = useState([
+    { title: 'Algebra Problem Set', subject: 'Mathematics', dueDate: '2026-08-10', submitted: 14, total: 22, status: 'Active' },
+    { title: 'Essay: Photosynthesis', subject: 'Biology', dueDate: '2026-08-08', submitted: 22, total: 22, status: 'Closed' },
+    { title: 'Lab Report — Newton Laws', subject: 'Physics', dueDate: '2026-08-15', submitted: 5, total: 22, status: 'Active' },
+  ]);
+
+  const handleAssignmentAttachmentChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setAssignmentAttachment({
+        fileName: file.name,
+        fileType: file.type || 'application/pdf',
+        fileData: ev.target?.result,
+        fileSize: `${Math.round(file.size / 1024)} KB`,
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handlePublishAssignment = async (e) => {
+    e.preventDefault();
+    if (!assignmentTitle.trim()) {
+      setError('Assignment title is required.');
+      return;
+    }
+    try {
+      setPublishingAssignment(true);
+      setError('');
+      setMessage('');
+
+      const res = await apiClient('/api/v1/assignments', {
+        method: 'POST',
+        body: JSON.stringify({
+          title: assignmentTitle,
+          classId: selectedClass,
+          subjectId: selectedSubject,
+          dueDate: assignmentDueDate || new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
+          description: assignmentDesc,
+          attachment: assignmentAttachment,
+        }),
+      });
+
+      if (res.success) {
+        const subName = subjects.find((s) => s._id === selectedSubject)?.name || 'General Subject';
+        setRecentAssignments((prev) => [
+          {
+            title: assignmentTitle,
+            subject: subName,
+            dueDate: assignmentDueDate || '2026-08-20',
+            submitted: 0,
+            total: students.length || 22,
+            status: 'Active',
+            attachment: assignmentAttachment,
+          },
+          ...prev,
+        ]);
+        setMessage(`✅ Assignment "${assignmentTitle}" published successfully!`);
+        setAssignmentTitle('');
+        setAssignmentDueDate('');
+        setAssignmentDesc('');
+        setAssignmentAttachment(null);
+      } else {
+        setError(res.error || 'Failed to publish assignment.');
+      }
+    } catch (err) {
+      setError(err.message || 'Error publishing assignment.');
+    } finally {
+      setPublishingAssignment(false);
+    }
+  };
+
   useEffect(() => {
     if (!authLoading) {
       if (!user || user.role !== 'teacher') {
@@ -167,14 +246,16 @@ export default function TeacherPage() {
         r.status,
       ]);
 
-      const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
-      const encodedUri = encodeURI(csvContent);
+      const csvText = [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+      const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.setAttribute('href', encodedUri);
+      link.setAttribute('href', url);
       link.setAttribute('download', `Teacher_Attendance_Report_${new Date().toISOString().split('T')[0]}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      URL.revokeObjectURL(url);
     } catch (err) {
       alert('Failed to export CSV: ' + err.message);
     }
@@ -516,14 +597,20 @@ export default function TeacherPage() {
             </h2>
 
             {/* Create Assignment Form */}
-            <div className="glass-card" style={{ padding: '28px', marginBottom: '28px' }}>
+            <form onSubmit={handlePublishAssignment} className="glass-card" style={{ padding: '28px', marginBottom: '28px' }}>
               <h3 style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '20px' }}>
                 Publish New Assignment
               </h3>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
                 <div>
                   <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>Title</label>
-                  <input className="input-field" placeholder="e.g. Chapter 3 — Algebra Problems" />
+                  <input
+                    className="input-field"
+                    placeholder="e.g. Chapter 3 — Algebra Problems"
+                    value={assignmentTitle}
+                    onChange={(e) => setAssignmentTitle(e.target.value)}
+                    required
+                  />
                 </div>
                 <div>
                   <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>Class</label>
@@ -540,35 +627,101 @@ export default function TeacherPage() {
                 </div>
                 <div>
                   <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>Due Date</label>
-                  <input className="input-field" type="date" min={new Date().toISOString().split('T')[0]} />
+                  <input
+                    className="input-field"
+                    type="date"
+                    min={new Date().toISOString().split('T')[0]}
+                    value={assignmentDueDate}
+                    onChange={(e) => setAssignmentDueDate(e.target.value)}
+                  />
                 </div>
               </div>
+
               <div style={{ marginTop: '16px' }}>
                 <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>Description / Instructions</label>
-                <textarea className="input-field" rows={3} placeholder="Describe the task and expected deliverables..." style={{ resize: 'vertical' }} />
+                <textarea
+                  className="input-field"
+                  rows={3}
+                  placeholder="Describe the task and expected deliverables..."
+                  value={assignmentDesc}
+                  onChange={(e) => setAssignmentDesc(e.target.value)}
+                  style={{ resize: 'vertical' }}
+                />
               </div>
-              <div style={{ marginTop: '16px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                <button className="btn-primary" style={{ padding: '10px 24px' }}>Publish Assignment</button>
-                <button style={{ padding: '10px 20px', borderRadius: '12px', background: 'rgba(255,255,255,0.08)', color: 'var(--text-main)', border: '1px solid var(--border-color)', cursor: 'pointer', fontWeight: '600' }}>
-                  Attach File
+
+              {/* Attachment File Input */}
+              <div style={{ marginTop: '16px' }}>
+                <label style={{ fontSize: '12px', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
+                  📎 Attachment File (PDF, Word, or Document Image)
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+                  <input
+                    type="file"
+                    id="teacher-asgn-attachment"
+                    onChange={handleAssignmentAttachmentChange}
+                    accept="application/pdf,image/*,.doc,.docx"
+                    style={{ display: 'none' }}
+                  />
+                  <label
+                    htmlFor="teacher-asgn-attachment"
+                    style={{
+                      padding: '10px 20px',
+                      borderRadius: '12px',
+                      background: 'rgba(0, 243, 255, 0.1)',
+                      color: 'var(--primary-color)',
+                      border: '1px solid rgba(0, 243, 255, 0.25)',
+                      cursor: 'pointer',
+                      fontWeight: '700',
+                      fontSize: '13px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                    }}
+                  >
+                    📎 Select File Attachment
+                  </label>
+
+                  {assignmentAttachment && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'var(--subcard-bg)', padding: '6px 14px', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
+                      <span style={{ fontSize: '12px', color: 'var(--text-main)', fontWeight: '700' }}>
+                        📄 {assignmentAttachment.fileName} ({assignmentAttachment.fileSize})
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setAssignmentAttachment(null)}
+                        style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontWeight: 'bold' }}
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ marginTop: '20px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+                <button
+                  type="submit"
+                  disabled={publishingAssignment}
+                  className="btn-primary"
+                  style={{ padding: '10px 28px', fontWeight: '800' }}
+                >
+                  {publishingAssignment ? 'Publishing...' : '🚀 Publish Assignment'}
                 </button>
               </div>
-            </div>
+            </form>
 
             {/* Recent Assignments List */}
             <div className="glass-card" style={{ padding: '28px' }}>
               <h3 style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '20px' }}>
                 Recent Assignments — Submission Tracker
               </h3>
-              {[
-                { title: 'Algebra Problem Set', subject: 'Mathematics', dueDate: '2026-08-10', submitted: 14, total: 22, status: 'Active' },
-                { title: 'Essay: Photosynthesis', subject: 'Biology', dueDate: '2026-08-08', submitted: 22, total: 22, status: 'Closed' },
-                { title: 'Lab Report — Newton Laws', subject: 'Physics', dueDate: '2026-08-15', submitted: 5, total: 22, status: 'Active' },
-              ].map((a, i) => (
+              {recentAssignments.map((a, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', borderRadius: '12px', background: 'rgba(255,255,255,0.04)', border: '1px solid var(--border-color)', marginBottom: '12px', flexWrap: 'wrap', gap: '12px' }}>
                   <div>
                     <p style={{ fontWeight: '700', color: 'var(--text-main)', marginBottom: '4px' }}>{a.title}</p>
-                    <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>{a.subject} · Due: {a.dueDate}</p>
+                    <p style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
+                      {a.subject} · Due: {a.dueDate} {a.attachment ? `· 📎 Attachment (${a.attachment.fileName})` : ''}
+                    </p>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                     <div style={{ textAlign: 'center' }}>
@@ -591,9 +744,32 @@ export default function TeacherPage() {
         {/* TAB 5: GRADEBOOK & EXAMINATIONS */}
         {activeTab === 'gradebook' && (
           <div key="gradebook" className="tab-content-animate">
-            <h2 style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '24px' }}>
-              Gradebook &amp; Examinations
-            </h2>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
+              <div>
+                <h2 style={{ fontSize: '20px', fontWeight: '800', color: 'var(--text-main)', margin: 0 }}>
+                  Gradebook &amp; Examinations
+                </h2>
+                <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: '4px 0 0' }}>
+                  Viewing Exam Marks &amp; Student Performance for: <strong>{classes.find(c => c._id === selectedClass)?.name || 'Grade 10 - Section A'}</strong>
+                </p>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <span style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: '700' }}>Active Class:</span>
+                <select
+                  className="input-field"
+                  value={selectedClass}
+                  onChange={(e) => setSelectedClass(e.target.value)}
+                  style={{ padding: '8px 14px', fontSize: '13px', fontWeight: '700' }}
+                >
+                  {classes.map((c) => (
+                    <option key={c._id} value={c._id}>
+                      {c.name} {c.section ? `(${c.section})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
 
             {/* KPI Row */}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '20px', marginBottom: '28px' }}>

@@ -80,6 +80,7 @@ export default function Sidebar({ activeTab, setActiveTab }) {
     { id: 'classes',      label: 'Classes & Sections',      icon: 'classes' },
     { id: 'subjects',     label: 'Subject Listing',         icon: 'subjects' },
     { id: 'sessions',     label: 'Academic Terms',          icon: 'sessions' },
+    { id: 'timetable',    label: 'Class Timetables',        icon: 'timetable' },
     { id: 'fees',         label: 'Fee Management',          icon: 'fees' },
     { id: 'audit-logs',   label: 'Audit Logs',              icon: 'audit' },
     { id: 'reports',      label: 'System Reports',          icon: 'reports' },

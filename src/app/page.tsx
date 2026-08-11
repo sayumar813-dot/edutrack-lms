@@ -23,10 +23,11 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (user) {
-      if (user.role === 'admin' || user.role === 'ADMIN') window.location.href = '/admin';
-      else if (user.role === 'teacher' || user.role === 'TEACHER') window.location.href = '/teacher';
-      else if (user.role === 'student' || user.role === 'STUDENT') window.location.href = '/student';
-      else if (user.role === 'parent' || user.role === 'PARENT') window.location.href = '/parent/ward-profile';
+      const r = user.role?.toLowerCase();
+      if (r === 'admin' || r === 'super_admin' || user.isSuperAdmin || user.isAdmin) window.location.href = '/admin';
+      else if (r === 'teacher') window.location.href = '/teacher';
+      else if (r === 'student') window.location.href = '/student';
+      else if (r === 'parent') window.location.href = '/parent/ward-profile';
     }
   }, [user]);
 
@@ -41,7 +42,7 @@ export default function LoginPage() {
         window.location.href = '/change-password';
       } else {
         const targetRole = res.role?.toLowerCase();
-        if (targetRole === 'admin') window.location.href = '/admin';
+        if (targetRole === 'admin' || targetRole === 'super_admin') window.location.href = '/admin';
         else if (targetRole === 'teacher') window.location.href = '/teacher';
         else if (targetRole === 'student') window.location.href = '/student';
         else if (targetRole === 'parent') window.location.href = '/parent/ward-profile';

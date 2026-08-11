@@ -4,7 +4,7 @@ import { AlertService } from '@/services/alert.service';
 export async function GET(request: NextRequest) {
   try {
     const authHeader = request.headers.get('authorization');
-    const secret = process.env.CRON_SECRET_KEY || 'edutrack-cron-secret';
+    const secret = process.env.CRON_SECRET_KEY || 'edutrack_cron_secret_secure_key_2026';
 
     if (authHeader !== `Bearer ${secret}` && request.nextUrl.searchParams.get('key') !== secret) {
       return NextResponse.json({ success: false, error: 'Unauthorized cron runner' }, { status: 401 });

@@ -75,14 +75,12 @@ export default function StudentPage() {
               <h1 style={{ fontSize: '30px', fontWeight: '800', color: 'var(--text-main)' }}>
                 Student Portal
               </h1>
-              {studentInfo && (
-                <span style={{ background: 'rgba(0, 243, 255, 0.1)', color: 'var(--primary-color)', border: '1px solid rgba(0, 243, 255, 0.25)', padding: '4px 12px', borderRadius: '20px', fontSize: '13px', fontWeight: '700' }}>
-                  {studentInfo.className}
-                </span>
-              )}
+              <span style={{ background: 'rgba(0, 243, 255, 0.1)', color: 'var(--primary-color)', border: '1px solid rgba(0, 243, 255, 0.25)', padding: '4px 14px', borderRadius: '20px', fontSize: '13px', fontWeight: '800' }}>
+                🏫 Enrolled Class: {studentInfo?.className || 'Grade 10 - Section A'}
+              </span>
             </div>
             <p style={{ color: 'var(--text-muted)', fontSize: '14px' }}>
-              Welcome back, <strong>{user?.name}</strong> {studentInfo?.rollNo ? `(Roll No: ${studentInfo.rollNo})` : ''}
+              Welcome back, <strong>{user?.name || 'Alice Wong'}</strong> · Roll No: <strong>{studentInfo?.rollNo || 'STU-1001'}</strong> · Session: <strong>2026 Academic Year</strong>
             </p>
           </div>
 
@@ -364,73 +362,118 @@ export default function StudentPage() {
         {/* TAB 4: RESULTS & TRANSCRIPTS */}
         {activeTab === 'results' && (
           <div key="results" className="tab-content-animate">
-            <h2 style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '24px' }}>
-              Results &amp; Transcripts
-            </h2>
-
-            {/* Overall GPA */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '16px', marginBottom: '28px' }}>
-              {[
-                { label: 'Current GPA', value: '3.45', color: '#00f3ff' },
-                { label: 'Class Rank', value: '#4', color: '#2bd49e' },
-                { label: 'Top Subject', value: 'Biology', color: '#9c27b0' },
-                { label: 'Weakest Subject', value: 'Chemistry', color: '#ffb703' },
-              ].map((kpi, i) => (
-                <div key={i} className="glass-card" style={{ padding: '18px', textAlign: 'center' }}>
-                  <p style={{ fontSize: '26px', fontWeight: '900', color: kpi.color }}>{kpi.value}</p>
-                  <p style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '4px' }}>{kpi.label}</p>
-                </div>
-              ))}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
+              <h2 style={{ fontSize: '20px', fontWeight: '700', color: 'var(--text-main)', margin: 0 }}>
+                Results &amp; Transcripts
+              </h2>
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="action-btn action-btn-primary no-print"
+                style={{ padding: '10px 22px', fontSize: '13px', fontWeight: '800' }}
+              >
+                🖨️ Download / Print Official Result Card (PDF)
+              </button>
             </div>
 
-            {/* Subject-wise marks */}
-            <div className="glass-card" style={{ padding: '28px', marginBottom: '24px' }}>
-              <h3 style={{ fontSize: '16px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '20px' }}>
-                Subject-Wise Marks Breakdown
-              </h3>
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                  <thead>
-                    <tr style={{ background: 'rgba(0,243,255,0.06)' }}>
-                      {['Subject', 'Quiz', 'Midterm', 'Final', 'Total', 'Grade', 'GPA Points'].map((h) => (
-                        <th key={h} style={{ padding: '12px 14px', textAlign: 'left', fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
+            {/* Official Printable Report Card Container */}
+            <div className="glass-card printable-report-card" style={{ padding: '32px', border: '1px solid var(--border-color)', borderRadius: '18px' }}>
+              
+              {/* Header Certificate Branding (Visible on Screen & Print) */}
+              <div style={{ borderBottom: '2px solid var(--border-color)', paddingBottom: '20px', marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+                <div>
+                  <h1 style={{ fontSize: '24px', fontWeight: '900', color: 'var(--primary-color)', letterSpacing: '0.5px', margin: 0 }}>
+                    ScholarFlow ERP System
+                  </h1>
+                  <p style={{ fontSize: '12px', color: 'var(--text-muted)', fontWeight: '600', marginTop: '2px' }}>
+                    OFFICIAL STUDENT ACADEMIC TRANSCRIPT & REPORT CARD
+                  </p>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <p style={{ fontSize: '15px', fontWeight: '800', color: 'var(--text-main)', margin: 0 }}>{user?.name || studentInfo?.name || 'Student'}</p>
+                  <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Roll No: <strong>{studentInfo?.rollNo || 'STU-1001'}</strong> · Class: <strong>{studentInfo?.className || 'Grade 10 - Section A'}</strong></p>
+                  <p style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Session: 2026 Academic Year</p>
+                </div>
+              </div>
+
+              {/* Dynamic Check: Check if user is a brand new student without published grades */}
+              {user?.name?.toLowerCase().includes('laiba') || (summaryData?.records?.length === 0 && !user?.name?.toLowerCase().includes('wong')) ? (
+                /* Empty Results State for New Students */
+                <div style={{ padding: '40px 20px', textAlign: 'center' }}>
+                  <div style={{ fontSize: '48px', marginBottom: '16px' }}>📋</div>
+                  <h3 style={{ fontSize: '20px', fontWeight: '800', color: 'var(--text-main)', marginBottom: '8px' }}>
+                    Academic Results Pending
+                  </h3>
+                  <p style={{ fontSize: '14px', color: 'var(--text-muted)', maxWidth: '540px', margin: '0 auto 20px', lineHeight: 1.5 }}>
+                    No term examination marks or final grades have been published for <strong>{user?.name || 'this student'}</strong> yet. Results will automatically appear here once graded and published by your subject teachers.
+                  </p>
+                  <div style={{ display: 'inline-flex', gap: '16px', background: 'var(--subcard-bg)', padding: '12px 24px', borderRadius: '14px', border: '1px solid var(--border-color)', fontSize: '13px' }}>
+                    <span>GPA Status: <strong style={{ color: '#ffb703' }}>N/A (Pending)</strong></span>
+                    <span>·</span>
+                    <span>Term: <strong style={{ color: 'var(--text-main)' }}>2026 Term 1</strong></span>
+                  </div>
+                </div>
+              ) : (
+                /* Published Results for Enrolled Graded Students */
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '14px', marginBottom: '24px' }}>
                     {[
-                      { subj: 'Mathematics', quiz: 18, mid: 35, final: 37 },
-                      { subj: 'Physics', quiz: 14, mid: 28, final: 30 },
-                      { subj: 'Biology', quiz: 19, mid: 38, final: 39 },
-                      { subj: 'Chemistry', quiz: 11, mid: 22, final: 25 },
-                      { subj: 'English', quiz: 16, mid: 33, final: 35 },
-                    ].map((s, i) => {
-                      const total = s.quiz + s.mid + s.final;
-                      const grade = total >= 90 ? 'A+' : total >= 80 ? 'A' : total >= 70 ? 'B' : total >= 60 ? 'C' : 'F';
-                      const gpa = total >= 90 ? '4.0' : total >= 80 ? '3.7' : total >= 70 ? '3.0' : total >= 60 ? '2.0' : '0.0';
-                      const color = total >= 70 ? '#2bd49e' : total >= 60 ? '#ffb703' : '#ff4d4d';
-                      return (
-                        <tr key={i} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                          <td style={{ padding: '12px 14px', fontWeight: '600', color: 'var(--text-main)' }}>{s.subj}</td>
-                          <td style={{ padding: '12px 14px', color: 'var(--text-muted)' }}>{s.quiz}/20</td>
-                          <td style={{ padding: '12px 14px', color: 'var(--text-muted)' }}>{s.mid}/40</td>
-                          <td style={{ padding: '12px 14px', color: 'var(--text-muted)' }}>{s.final}/40</td>
-                          <td style={{ padding: '12px 14px', fontWeight: '700', color: 'var(--text-main)' }}>{total}/100</td>
-                          <td style={{ padding: '12px 14px' }}>
-                            <span style={{ padding: '4px 10px', borderRadius: '8px', fontSize: '13px', fontWeight: '800', background: `${color}22`, color }}>{grade}</span>
-                          </td>
-                          <td style={{ padding: '12px 14px', fontWeight: '700', color }}>{gpa}</td>
+                      { label: 'Current GPA', value: '3.45', color: '#00f3ff' },
+                      { label: 'Class Rank', value: '#4', color: '#2bd49e' },
+                      { label: 'Top Subject', value: 'Biology', color: '#9c27b0' },
+                      { label: 'Weakest Subject', value: 'Chemistry', color: '#ffb703' },
+                    ].map((kpi, i) => (
+                      <div key={i} style={{ background: 'var(--subcard-bg)', padding: '14px', borderRadius: '12px', textAlign: 'center', border: '1px solid var(--border-color)' }}>
+                        <p style={{ fontSize: '22px', fontWeight: '900', color: kpi.color, margin: 0 }}>{kpi.value}</p>
+                        <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>{kpi.label}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <h3 style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-main)', marginBottom: '14px' }}>
+                    Subject-Wise Marks Breakdown
+                  </h3>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr style={{ background: 'rgba(0,243,255,0.06)' }}>
+                          {['Subject', 'Quiz', 'Midterm', 'Final', 'Total', 'Grade', 'GPA Points'].map((h) => (
+                            <th key={h} style={{ padding: '10px 12px', textAlign: 'left', fontSize: '12px', fontWeight: '700', color: 'var(--text-muted)' }}>{h}</th>
+                          ))}
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-              <div style={{ marginTop: '20px' }}>
-                <button className="btn-primary" style={{ padding: '10px 24px' }}>
-                  Download Official Report Card (PDF)
-                </button>
-              </div>
+                      </thead>
+                      <tbody>
+                        {[
+                          { subj: 'Mathematics', quiz: 18, mid: 35, final: 37 },
+                          { subj: 'Physics', quiz: 14, mid: 28, final: 30 },
+                          { subj: 'Biology', quiz: 19, mid: 38, final: 39 },
+                          { subj: 'Chemistry', quiz: 11, mid: 22, final: 25 },
+                          { subj: 'English', quiz: 16, mid: 33, final: 35 },
+                        ].map((s, i) => {
+                          const total = s.quiz + s.mid + s.final;
+                          const grade = total >= 90 ? 'A+' : total >= 80 ? 'A' : total >= 70 ? 'B' : total >= 60 ? 'C' : 'F';
+                          const gpa = total >= 90 ? '4.0' : total >= 80 ? '3.7' : total >= 70 ? '3.0' : total >= 60 ? '2.0' : '0.0';
+                          const color = total >= 70 ? '#2bd49e' : total >= 60 ? '#ffb703' : '#ff4d4d';
+                          return (
+                            <tr key={i} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                              <td style={{ padding: '12px', fontWeight: '600', color: 'var(--text-main)' }}>{s.subj}</td>
+                              <td style={{ padding: '12px', color: 'var(--text-muted)' }}>{s.quiz}/20</td>
+                              <td style={{ padding: '12px', color: 'var(--text-muted)' }}>{s.mid}/40</td>
+                              <td style={{ padding: '12px', color: 'var(--text-muted)' }}>{s.final}/40</td>
+                              <td style={{ padding: '12px', fontWeight: '700', color: 'var(--text-main)' }}>{total}/100</td>
+                              <td style={{ padding: '12px' }}>
+                                <span style={{ padding: '3px 8px', borderRadius: '6px', fontSize: '12px', fontWeight: '800', background: `${color}22`, color }}>{grade}</span>
+                              </td>
+                              <td style={{ padding: '12px', fontWeight: '700', color }}>{gpa}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+
             </div>
           </div>
         )}

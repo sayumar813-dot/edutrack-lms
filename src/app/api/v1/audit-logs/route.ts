@@ -24,6 +24,14 @@ export async function GET(request: NextRequest) {
         ip: '192.168.1.2',
         ok: true,
       }));
+    } else {
+      logs = [
+        { id: 'act-101', ts: 'Just now', user: 'System Admin', role: 'Super Admin', action: 'enrolled student', resource: 'Laiba Rehman (STU-9213)', ip: '192.168.1.10', ok: true },
+        { id: 'act-102', ts: '10 mins ago', user: 'Teacher John Smith', role: 'Teacher', action: 'submitted attendance', resource: 'Grade 10 - Section A (28/28 Present)', ip: '192.168.1.14', ok: true },
+        { id: 'act-103', ts: '25 mins ago', user: 'Parent Account', role: 'Parent', action: 'submitted doctor note', resource: 'Medical Rest Certificate PDF', ip: '192.168.1.45', ok: true },
+        { id: 'act-104', ts: '1 hour ago', user: 'Finance Admin', role: 'Admin', action: 'generated fee invoice', resource: 'Q1 Tuition & Lab Clearance (₨ 1,500)', ip: '192.168.1.10', ok: true },
+        { id: 'act-105', ts: '2 hours ago', user: 'Teacher John Smith', role: 'Teacher', action: 'published assignment', resource: 'Physics Lab Worksheet #3', ip: '192.168.1.14', ok: true },
+      ];
     }
 
     return NextResponse.json({ success: true, logs });

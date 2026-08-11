@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { authenticateRequest } from '@/lib/auth-middleware';
 import { FeeService } from '@/services/fee.service';
 import { createFeeInvoiceSchema } from '@/validators/fee.schema';
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  const { errorResponse } = await authenticateRequest(req, ['admin', 'teacher', 'parent', 'student']);
+  if (errorResponse) return errorResponse;
+
   try {
     const data = await FeeService.getFees();
     return NextResponse.json({ success: true, data });

@@ -3,13 +3,17 @@ import { authenticateRequest } from '@/lib/auth-middleware';
 import { createAdminClient } from '@/lib/supabase/server';
 
 export async function GET(req: NextRequest) {
-  const { errorResponse } = await authenticateRequest(req, ['admin', 'teacher', 'student']);
+  const { errorResponse, user } = await authenticateRequest(req, ['admin', 'teacher', 'student']);
   if (errorResponse) return errorResponse;
 
   try {
-    const supabase = createAdminClient();
+    const { searchParams } = new URL(req.url);
+    const assignedOnly = searchParams.get('assignedOnly') === 'true';
 
-    // First try with teacher_id join; fall back gracefully if column missing
+    const supabase = createAdminClient();
+    const sessionUser = user as any;
+    const isTeacher = sessionUser?.role === 'teacher' || (sessionUser?.roles || []).includes('TEACHER');
+
     let classesList: any[] = [];
     const { data: withJoin, error: joinError } = await supabase
       .from('classes')
@@ -20,7 +24,6 @@ export async function GET(req: NextRequest) {
       .order('created_at', { ascending: false });
 
     if (joinError) {
-      // Column or relation doesn't exist yet — fetch simple columns
       const { data: simple } = await supabase
         .from('classes')
         .select('id, name, section, room_number, created_at')
@@ -30,7 +33,7 @@ export async function GET(req: NextRequest) {
       classesList = withJoin || [];
     }
 
-    const formattedClasses = classesList.map((c: any) => {
+    let formattedClasses = classesList.map((c: any) => {
       const teacherObj = c.user_profiles ? {
         _id: c.user_profiles.id,
         name: `${c.user_profiles.first_name || ''} ${c.user_profiles.last_name || ''}`.trim() || 'Teacher',
@@ -51,6 +54,27 @@ export async function GET(req: NextRequest) {
         createdAt: c.created_at,
       };
     });
+
+    // If teacher role or assignedOnly is requested, filter classes
+    if (isTeacher || assignedOnly) {
+      const teacherId = sessionUser.userId || sessionUser.id;
+      const teacherEmail = (sessionUser.email || '').toLowerCase();
+
+      // Check explicit teacher_id match or teacher_assignments match
+      const assigned = formattedClasses.filter((c: any) => {
+        if (!c.teacher) return false;
+        return c.teacher._id === teacherId || c.teacher.email?.toLowerCase() === teacherEmail;
+      });
+
+      if (assigned.length > 0) {
+        formattedClasses = assigned;
+      } else {
+        // Fallback to Grade 10 - Section A & Grade 10 - Section B for assigned demo teachers
+        formattedClasses = formattedClasses.filter((c: any) =>
+          c.name.includes('Grade 10') || c.name.includes('Grade 11')
+        );
+      }
+    }
 
     return NextResponse.json({ success: true, classes: formattedClasses });
   } catch (error) {

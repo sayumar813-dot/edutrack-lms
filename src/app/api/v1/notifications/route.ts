@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/server';
 
 function formatTimeAgo(dateString?: string) {
   if (!dateString) return 'Just now';
@@ -13,156 +13,93 @@ function formatTimeAgo(dateString?: string) {
   return `${diffDays}d ago`;
 }
 
+function severityBadge(sev?: string) {
+  if (sev === 'CRITICAL') return '🚨';
+  if (sev === 'HIGH') return '⚠️';
+  if (sev === 'MEDIUM') return '📉';
+  return 'ℹ️';
+}
+
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const role = (searchParams.get('role') || 'admin').toLowerCase();
-    const supabase = await createClient();
+    const rawRole = (searchParams.get('role') || 'admin').toUpperCase();
+    const supabase = createAdminClient();
 
     const notifications: any[] = [];
 
-    if (role === 'admin') {
-      // 1. Fetch real audit logs from Supabase
+    // Target roles to fetch for current user
+    let targetRoles = ['ALL'];
+    if (rawRole === 'SUPER_ADMIN' || rawRole === 'SUPER_ADMINISTRATOR') {
+      targetRoles = ['SUPER_ADMIN', 'ADMIN', 'ALL'];
+    } else if (rawRole === 'ADMIN') {
+      targetRoles = ['ADMIN', 'ALL'];
+    } else if (rawRole === 'TEACHER') {
+      targetRoles = ['TEACHER', 'ALL'];
+    } else if (rawRole === 'STUDENT') {
+      targetRoles = ['STUDENT', 'ALL'];
+    } else if (rawRole === 'PARENT') {
+      targetRoles = ['PARENT', 'ALL'];
+    }
+
+    // 1. Fetch live Smart Alerts matching target roles
+    const { data: dbAlerts } = await supabase
+      .from('alerts')
+      .select('*')
+      .in('target_role', targetRoles)
+      .order('created_at', { ascending: false })
+      .limit(10);
+
+    if (dbAlerts && dbAlerts.length > 0) {
+      dbAlerts.forEach((alt: any) => {
+        notifications.push({
+          id: alt.id,
+          title: `${severityBadge(alt.severity)} ${alt.title}`,
+          desc: alt.message,
+          time: formatTimeAgo(alt.created_at),
+          unread: alt.status === 'ACTIVE' || alt.status === 'ESCALATED',
+          severity: alt.severity,
+          status: alt.status,
+        });
+      });
+    }
+
+    // 2. Add Role-Specific Operational Context if alerts list is light
+    if (rawRole === 'ADMIN' || rawRole === 'SUPER_ADMIN') {
       const { data: logs } = await supabase
         .from('audit_logs')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(5);
-
-      if (logs && logs.length > 0) {
-        logs.forEach((log: any) => {
-          notifications.push({
-            id: log.id,
-            title: `Audit Log: ${log.action.replace(/_/g, ' ')}`,
-            desc: `Entity: ${log.entity}${log.entity_id ? ` (${log.entity_id.slice(0, 8)})` : ''}`,
-            time: formatTimeAgo(log.created_at),
-            unread: true,
-          });
-        });
-      }
-
-      // 2. Fetch real Fee Invoices status
-      const { data: feeStats } = await supabase
-        .from('fees')
-        .select('id, status, amount, title, created_at')
-        .order('created_at', { ascending: false })
         .limit(3);
 
-      if (feeStats && feeStats.length > 0) {
-        feeStats.forEach((fee: any) => {
-          notifications.push({
-            id: `fee-${fee.id}`,
-            title: `Fee Invoice: ${fee.title}`,
-            desc: `Amount: ₨ ${fee.amount?.toLocaleString() || 0} — Status: ${fee.status}`,
-            time: formatTimeAgo(fee.created_at),
-            unread: fee.status === 'UNPAID',
-          });
+      (logs || []).forEach((log: any) => {
+        notifications.push({
+          id: log.id,
+          title: `📋 Audit Trail: ${log.action.replace(/_/g, ' ')}`,
+          desc: `Entity: ${log.entity}${log.entity_id ? ` (${log.entity_id.slice(0, 8)})` : ''}`,
+          time: formatTimeAgo(log.created_at),
+          unread: false,
         });
-      }
+      });
+    }
 
-      // 3. Fetch real System Roster Counts
-      const { count: studentCount } = await supabase
-        .from('student_profiles')
-        .select('*', { count: 'exact', head: true });
-
-      const { count: teacherCount } = await supabase
-        .from('user_profiles')
-        .select('*', { count: 'exact', head: true })
-        .contains('roles', ['TEACHER']);
-
-      const { count: classCount } = await supabase
-        .from('classes')
-        .select('*', { count: 'exact', head: true });
-
+    if (notifications.length === 0) {
       notifications.push({
-        id: 'system-status-summary',
-        title: 'System Roster Overview',
-        desc: `Enrolled: ${studentCount || 0} Students | ${teacherCount || 0} Teachers | ${classCount || 0} Classes`,
+        id: 'sys-active',
+        title: 'ℹ️ ScholarFlow System Active',
+        desc: 'All academic rosters & notification matrix up to date',
         time: 'Just now',
         unread: false,
       });
-
-    } else if (role === 'teacher') {
-      const { data: assignments } = await supabase
-        .from('assignments')
-        .select('id, title, due_date, created_at')
-        .order('created_at', { ascending: false })
-        .limit(4);
-
-      if (assignments && assignments.length > 0) {
-        assignments.forEach((a: any) => {
-          notifications.push({
-            id: a.id,
-            title: `Assignment: ${a.title}`,
-            desc: `Due Date: ${new Date(a.due_date).toLocaleDateString()}`,
-            time: formatTimeAgo(a.created_at),
-            unread: true,
-          });
-        });
-      } else {
-        notifications.push({
-          id: 'teacher-system-ready',
-          title: 'Class Portal Ready',
-          desc: 'Attendance & Gradebook modules active for current session',
-          time: 'Just now',
-          unread: false,
-        });
-      }
-    } else if (role === 'student' || role === 'parent') {
-      const { data: fees } = await supabase
-        .from('fees')
-        .select('id, title, amount, status, created_at')
-        .order('created_at', { ascending: false })
-        .limit(3);
-
-      if (fees && fees.length > 0) {
-        fees.forEach((f: any) => {
-          notifications.push({
-            id: `fee-${f.id}`,
-            title: `Tuition Fee: ${f.title}`,
-            desc: `Amount: ₨ ${f.amount?.toLocaleString() || 0} | Status: ${f.status}`,
-            time: formatTimeAgo(f.created_at),
-            unread: f.status === 'UNPAID',
-          });
-        });
-      }
-
-      const { data: exams } = await supabase
-        .from('exams')
-        .select('id, title, exam_type, max_marks, created_at')
-        .order('created_at', { ascending: false })
-        .limit(2);
-
-      if (exams && exams.length > 0) {
-        exams.forEach((e: any) => {
-          notifications.push({
-            id: `exam-${e.id}`,
-            title: `Exam Scheduled: ${e.title}`,
-            desc: `Type: ${e.exam_type} | Max Marks: ${e.max_marks}`,
-            time: formatTimeAgo(e.created_at),
-            unread: true,
-          });
-        });
-      }
-
-      if (notifications.length === 0) {
-        notifications.push({
-          id: 'student-portal-notice',
-          title: 'Academic Portal Active',
-          desc: 'All course records & fee ledgers up to date',
-          time: 'Just now',
-          unread: false,
-        });
-      }
     }
 
-    return NextResponse.json({ success: true, role, notifications });
+    return NextResponse.json({ success: true, role: rawRole, notifications });
   } catch (error: any) {
     console.error('Fetch notifications error:', error);
     return NextResponse.json({
       success: true,
       notifications: [
-        { id: 'sys-active', title: 'ScholarFlow System Active', desc: 'Real-time database sync active', time: 'Just now', unread: false }
+        { id: 'sys-active', title: 'ℹ️ ScholarFlow System Active', desc: 'Real-time notification engine active', time: 'Just now', unread: false }
       ]
     });
   }
