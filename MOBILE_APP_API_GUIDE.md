@@ -154,12 +154,16 @@ Returns exam schedules, marks breakdown, and report cards.
 
 ---
 
-## 🔑 7. Test Credentials for Mobile Developer
+## 🔑 7. Development & Sandbox Test Accounts
 
-| Role | Email | Password |
+> 🛡️ **Security Note**: These test credentials are for local development / sandbox testing only. Production passwords should be issued via secure administrative onboarding.
+
+| Role | Test Email | Environment |
 |---|---|---|
-| **👑 Super Admin** | `superadmin@edutrack.com` | `mubashir7661` |
-| **🏫 School Admin** | `admin@edutrack.com` | `mubashir7661` |
-| **👨‍🏫 Teacher** | `john.smith@edutrack.com` | `mubashir7661` |
-| **🎓 Student** | `alice.wong@edutrack.com` | `mubashir7661` |
-| **👨‍👩‍👧 Parent** | `parent.wong@edutrack.com` | `mubashir7661` |
+| **👑 Super Admin** | `superadmin@edutrack.com` | Sandbox / Development |
+| **🏫 School Admin** | `admin@edutrack.com` | Sandbox / Development |
+| **👨‍🏫 Teacher** | `john.smith@edutrack.com` | Sandbox / Development |
+| **🎓 Student** | `alice.wong@edutrack.com` | Sandbox / Development |
+| **👨‍👩‍👧 Parent** | `parent.wong@edutrack.com` | Sandbox / Development |
+
+*Default Sandbox Password*: `mubashir7661` *(Dev environment only)*
